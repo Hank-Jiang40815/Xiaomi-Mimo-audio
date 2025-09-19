@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "mimo_audio"
 version = "0.1.0"
@@ -19,5 +23,9 @@ dependencies = [
     "gradio",
     "zhon"
 ]
+
+[tool.setuptools.packages.find]
+include = ["models*"]
+exclude = ["assets*", "checkpoints*", "examples*", "build*", "dist*"]
 
 
