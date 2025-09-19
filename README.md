@@ -24,7 +24,7 @@
   &nbsp;|
   <a href="https://github.com/XiaomiMiMo/MiMo-Audio/blob/main/MiMo-Audio-Technical-Report.pdf" target="_blank">📄 Paper</a>
   &nbsp;|
-  <a href="https://XiaomiMiMo.github.io/MiMo-Audio" target="_blank">📰 Blog</a>
+  <a href="https://xiaomimimo.github.io/MiMo-Audio-Demo" target="_blank">📰 Blog</a>
   &nbsp;|
   <a href="https://huggingface.co/spaces/XiaomiMiMo/mimo_audio_chat" target="_blank">🔥 Online Demo</a>
   &nbsp;|
@@ -57,7 +57,7 @@ MiMo-Audio couples a patch encoder, an LLM, and a patch decoder to improve model
 
 ##  Explore MiMo-Audio Now! 🚀🚀🚀
 - 🎧 **Try the Hugging Face demo:** [MiMo-Audio Demo](https://huggingface.co/spaces/XiaomiMiMo/mimo_audio_chat)
-- 📰 **Read the Official Blog:** [MiMo-Audio Blog](https://XiaomiMiMo.github.io/MiMo-Audio)
+- 📰 **Read the Official Blog:** [MiMo-Audio Blog](https://xiaomimimo.github.io/MiMo-Audio-Demo)
 - 📄 **Dive into the Technical Report:** [MiMo-Audio Technical Report](https://github.com/XiaomiMiMo/MiMo-Audio/blob/main/MiMo-Audio-Technical-Report.pdf)
 
 
