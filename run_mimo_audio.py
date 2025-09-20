@@ -5,7 +5,7 @@ import os
 import tempfile
 import argparse
 from pathlib import Path
-from models.mimo_audio.mimo_audio import MimoAudio
+from src.mimo_audio.mimo_audio import MimoAudio
 
 
 class TTSGenerator:
@@ -87,9 +87,9 @@ class MultiModalSpeechInterface:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             
             if model_path is None:
-                model_path = "./checkpoints/MiMo-Audio-7B-Instruct"
+                model_path = "./models/MiMo-Audio-7B-Instruct"
             if tokenizer_path is None:
-                tokenizer_path = "./checkpoints/MiMo-Audio-Tokenizer"
+                tokenizer_path = "./models/MiMo-Audio-Tokenizer"
             
 
             print(f"Model path: {model_path}")
@@ -309,13 +309,13 @@ class MultiModalSpeechInterface:
                             
                             model_path = gr.Textbox(
                                 label="Model path",
-                                placeholder="Leave blank to use default path",
+                                placeholder="Leave blank to use default path: ./models/MiMo-Audio-7B-Instruct",
                                 lines=3
                             )
                             
                             tokenizer_path = gr.Textbox(
                                 label="Tokenizer path",
-                                placeholder="Leave blank to use default path",
+                                placeholder="Leave blank to use default path: ./models/MiMo-Audio-Tokenizer",
                                 lines=3
                             )
                             

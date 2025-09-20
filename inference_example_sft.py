@@ -1,8 +1,8 @@
 # Copyright 2025 Xiaomi Corporation.
-from models.mimo_audio.mimo_audio import MimoAudio
+from src.mimo_audio.mimo_audio import MimoAudio
 
-model_path = "checkpoints/MiMo-Audio-7B-Instruct"
-tokenizer_path = "checkpoints/MiMo-Audio-Tokenizer"
+model_path = "models/MiMo-Audio-7B-Instruct"
+tokenizer_path = "models/MiMo-Audio-Tokenizer"
 
 
 model = MimoAudio(model_path, tokenizer_path)

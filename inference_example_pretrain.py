@@ -1,8 +1,8 @@
 # Copyright 2025 Xiaomi Corporation.
-from models.mimo_audio.mimo_audio import MimoAudio
+from src.mimo_audio.mimo_audio import MimoAudio
 
-model_path = "checkpoints/MiMo-Audio-7B-Base"
-tokenizer_path = "checkpoints/MiMo-Audio-Tokenizer"
+model_path = "models/MiMo-Audio-7B-Base"
+tokenizer_path = "models/MiMo-Audio-Tokenizer"
 
 
 model = MimoAudio(model_path, tokenizer_path)
@@ -41,4 +41,4 @@ prompt_examples = [
 ]
 
 output_audio_path = "examples/in_context_learning_s2s.wav"
-text_channel_output = model.in_context_learning_s2s(instruction, prompt_examples, input_audio, max_new_tokens=None, output_audio_path=output_audio_path)
+text_channel_output = model.in_context_learning_s2s(instruction, prompt_examples, input_audio, max_new_tokens=8192, output_audio_path=output_audio_path)

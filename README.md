@@ -69,19 +69,43 @@ MiMo-Audio couples a patch encoder, an LLM, and a patch decoder to improve model
 | MiMo-Audio-7B-Instruct | [XiaomiMiMo/MiMo-Audio-7B-Instruct](https://huggingface.co/XiaomiMiMo/MiMo-Audio-7B-Instruct) |
 
 
+```bash
+pip install huggingface-hub
+hf download XiaomiMiMo/MiMo-Audio-Tokenizer --local-dir ./models/MiMo-Audio-Tokenizer
+hf download XiaomiMiMo/MiMo-Audio-7B-Base --local-dir ./models/MiMo-Audio-7B-Base
+hf download XiaomiMiMo/MiMo-Audio-7B-Instruct --local-dir ./models/MiMo-Audio-7B-Instruct
+```
 
 ## Getting Started
 
 Spin up the MiMo-Audio demo in minutes with the built-in Gradio app.
 
+### Prerequisites (Linux)
+
+* Python 3.12
+* CUDA >= 12.0
+
 ### Installation
-``` sh
+
+```bash
 git clone https://github.com/XiaomiMiMo/MiMo-Audio.git
 cd MiMo-Audio
-pip install -e .
+pip install -r requirements.txt
+pip install flash-attn==2.7.4.post1
 ```
+
+> \[!Note]
+> If compilation takes too long or encounters issues, you can download the precompiled wheel and install it manually:
+>
+> * [Download Precompiled Wheel](https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp312-cp312-linux_x86_64.whl)
+>
+> ```sh
+> pip install /path/to/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp312-cp312-linux_x86_64.whl
+> ```
+
 ### Run the demo
-``` sh
+
+```bash
 python run_mimo_audio.py
 ```
 
