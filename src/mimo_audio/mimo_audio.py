@@ -574,7 +574,7 @@ class MimoAudio:
         lm_prompt = []
 
         if add_history and self.history is not None:
-            lm_prompt = [
+            lm_prompt += [
                 InputSegment(
                     text=f"<|im_start|>user\n",
                     speech_zeroemb_idx=self.speech_zeroemb_idx,
@@ -597,22 +597,19 @@ class MimoAudio:
                 ),
             ]
         else:
-
             if prompt_speech:
-                lm_prompt = [
+                lm_prompt += [
                     InputSegment(
                         text="<|im_start|>system\n",
                         speech_zeroemb_idx=self.speech_zeroemb_idx,
                         text_zeroemb_idx=self.empty_token,
-                    )]
-                lm_prompt += [
+                    ),
                     InputSegment(
-                        text=f"Your voice should be：",
+                        text=f"Your voice should be:",
                         speech_zeroemb_idx=self.speech_zeroemb_idx,
                         text_zeroemb_idx=self.empty_token,
                     ),
                     InputSegment(
-                        text="",
                         audio=self.preprocess_input(prompt_speech),
                         speech_zeroemb_idx=self.speech_zeroemb_idx,
                         text_zeroemb_idx=self.empty_token,
@@ -629,11 +626,18 @@ class MimoAudio:
                     text=f"<|im_start|>user\n",
                     speech_zeroemb_idx=self.speech_zeroemb_idx,
                     text_zeroemb_idx=self.empty_token,
-                )]
+                )
+            ]
+            
             if system_prompt:
                 lm_prompt += [
                     InputSegment(
                         text=system_prompt,
+                        speech_zeroemb_idx=self.speech_zeroemb_idx,
+                        text_zeroemb_idx=self.empty_token,
+                    ),
+                    InputSegment(
+                        text="\n\n",
                         speech_zeroemb_idx=self.speech_zeroemb_idx,
                         text_zeroemb_idx=self.empty_token,
                     )
@@ -674,16 +678,13 @@ class MimoAudio:
                     text="<|im_start|>system\n",
                     speech_zeroemb_idx=self.speech_zeroemb_idx,
                     text_zeroemb_idx=self.empty_token,
-                )
-            ]
-            lm_prompt += [
+                ),
                 InputSegment(
-                    text=f"Your voice should be：",
+                    text=f"Your voice should be:",
                     speech_zeroemb_idx=self.speech_zeroemb_idx,
                     text_zeroemb_idx=self.empty_token,
                 ),
                 InputSegment(
-                    text="",
                     audio=self.preprocess_input(prompt_speech),
                     speech_zeroemb_idx=self.speech_zeroemb_idx,
                     text_zeroemb_idx=self.empty_token,
@@ -704,10 +705,15 @@ class MimoAudio:
                         text_zeroemb_idx=self.empty_token,
                     )
                 ]
-                if system_prompt:
+                if system_prompt and i == 0:
                     lm_prompt += [
                         InputSegment(
                             text=system_prompt,
+                            speech_zeroemb_idx=self.speech_zeroemb_idx,
+                            text_zeroemb_idx=self.empty_token,
+                        ),
+                        InputSegment(
+                            text="\n\n",
                             speech_zeroemb_idx=self.speech_zeroemb_idx,
                             text_zeroemb_idx=self.empty_token,
                         )
