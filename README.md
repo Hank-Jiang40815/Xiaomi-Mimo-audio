@@ -71,6 +71,7 @@ MiMo-Audio couples a patch encoder, an LLM, and a patch decoder to improve model
 
 ```bash
 pip install huggingface-hub
+
 hf download XiaomiMiMo/MiMo-Audio-Tokenizer --local-dir ./models/MiMo-Audio-Tokenizer
 hf download XiaomiMiMo/MiMo-Audio-7B-Base --local-dir ./models/MiMo-Audio-7B-Base
 hf download XiaomiMiMo/MiMo-Audio-7B-Instruct --local-dir ./models/MiMo-Audio-7B-Instruct
@@ -95,7 +96,7 @@ pip install flash-attn==2.7.4.post1
 ```
 
 > \[!Note]
-> If compilation takes too long or encounters issues, you can download the precompiled wheel and install it manually:
+> If the compilation of flash-attn takes too long, you can download the precompiled wheel and install it manually:
 >
 > * [Download Precompiled Wheel](https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp312-cp312-linux_x86_64.whl)
 >
