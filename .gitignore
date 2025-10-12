@@ -8,3 +8,34 @@ checkpoints/
 *.pyd
 *.pyw
 *.pyz
+
+# 輸出目錄
+outputs/
+*.log
+
+# 生成的音頻檔案（可選）
+examples/tts.wav
+examples/instruct_tts.wav
+examples/natural_instruction_tts.wav
+examples/spoken_dialogue_assistant_turn_2.wav
+examples/in_context_learning_s2s.wav
+
+# Python 運行時
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+
+# 虛擬環境
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
