@@ -1,0 +1,31 @@
+# VCS
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Caches
+.mypy_cache/
+.pytest_cache/
+.cache/
+
+# Local artifacts
+models/
+outputs/
+*.wav
+*.mp3
+*.flac
+*.ogg
+
+# Large docs
+MiMo-Audio-Technical-Report.pdf
+assets/
+
