@@ -39,3 +39,6 @@ ENV/
 
 # macOS
 .DS_Store
+
+# Model files (download separately)
+models/
