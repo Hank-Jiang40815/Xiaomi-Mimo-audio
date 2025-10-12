@@ -13,12 +13,6 @@ checkpoints/
 outputs/
 *.log
 
-# 生成的音頻檔案（可選）
-examples/tts.wav
-examples/instruct_tts.wav
-examples/natural_instruction_tts.wav
-examples/spoken_dialogue_assistant_turn_2.wav
-examples/in_context_learning_s2s.wav
 
 # Python 運行時
 __pycache__/
