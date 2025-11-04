@@ -22,7 +22,7 @@ prompt_examples = [
     {
         "input_audio": "examples/boy1_papercup_LDV_002.wav",
         "output_audio": "examples/boy1_papercup_clean_002.wav",
-        "output_transcription": "Example of enhanced audio quality.",  # Replace with actual transcription if known
+        "output_transcription": "公司接到一份國外訂單.",  # LDV_002/clean_002 的內容
     },
 ]
 
