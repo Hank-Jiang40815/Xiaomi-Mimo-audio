@@ -281,3 +281,34 @@ A: 檢查：
 ## 參考資料
 - MiMo-Audio GitHub: https://github.com/XiaomiMiMo/MiMo-Audio
 - Hugging Face Models: https://huggingface.co/XiaomiMiMo
+
+## 實驗三：optical 正規化後的初步降噪（noisereduce）
+
+### 目的
+- `examples/optical_normalized/{mix,spk1}` 仍可聽見高頻砂點/顆粒噪聲；以 noisereduce 先做保守降噪，供 few‑shot 與主觀評測使用。
+
+### 流程與參數
+- 腳本：`scripts/denoise_optical.py`
+- 來源與輸出：
+  - 來源：`examples/optical_normalized/{mix,spk1}`
+  - 輸出：`examples/optical_denoised/{mix,spk1}`（mirror 同名）
+- 前處理濾波：`highpass=90 Hz`、`lowpass=8500 Hz`
+- 降噪：noisereduce 非平穩（`stationary=False`）、`prop_decrease=0.85`
+- 平滑：`time_mask_smooth_ms=64`、`freq_mask_smooth_hz=150`
+- 後處理：峰值正規化 `-1.0 dBFS`，輸出 `WAV PCM16`
+
+### 執行（Docker）
+```bash
+docker build -t mimo-audio:latest .
+docker run --rm -u $(id -u):$(id -g) -v "$PWD":/app -w /app mimo-audio:latest \
+  python -u scripts/denoise_optical.py
+```
+
+### 結果摘要（2025-11-06）
+- 檔案數：
+  - mix：3456 個
+  - spk1：3456 個
+- 容量：
+  - `examples/optical_denoised/mix`：435 MB
+  - `examples/optical_denoised/spk1`：435 MB
+- 備註：輸出檔依 `.gitignore` 規則忽略版本控管。
