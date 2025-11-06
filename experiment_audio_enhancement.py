@@ -1,5 +1,6 @@
 # Copyright 2025 Xiaomi Corporation.
 # Audio Enhancement Experiment using In-Context Learning
+import os
 from src.mimo_audio.mimo_audio import MimoAudio
 
 model_path = "models/MiMo-Audio-7B-Base"
@@ -15,7 +16,11 @@ instruction = "Enhance the audio quality and remove noise from the input speech.
 
 # Input: Low-quality audio that we want to enhance
 # Use denoised optical dataset: mix=noisy, spk1=clean (denoised)
-input_audio = "examples/optical_denoised/mix/boy1_WOLDVlean_012.wav"
+test_audio_files = [
+    "examples/optical_denoised/mix/boy1_WOLDVlean_021.wav",
+    "examples/optical_denoised/mix/boy1_WOLDVlean_022.wav",
+    "examples/optical_denoised/mix/boy1_WOLDVlean_023.wav"
+]
 
 # Few-shot examples: Demonstrate LDV → clean transformation
 # Note: We only have 2 example pairs, ideally we'd want 3-5 pairs
@@ -70,42 +75,101 @@ prompt_examples = [
         "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_010.wav",
         "output_transcription": "秘書在幫老闆撰寫文件.",
     },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_011.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_011.wav",
+        "output_transcription": "我今年初一像爸爸拜年.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_012.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_012.wav",
+        "output_transcription": "我每天早上都要喝杯茶.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_013.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_013.wav",
+        "output_transcription": "他的名片上有很多頭銜.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_014.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_014.wav",
+        "output_transcription": "這個市場的東西很便宜.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_015.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_015.wav",
+        "output_transcription": "我們喜歡看電視連續劇.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_016.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_016.wav",
+        "output_transcription": "他們非常熟習中國歷史.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_017.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_017.wav",
+        "output_transcription": "這個人看起來彬彬有禮.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_018.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_018.wav",
+        "output_transcription": "他的臉上長了很多麻疹.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_019.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_019.wav",
+        "output_transcription": "他今年七月要參加考試.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_020.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_020.wav",
+        "output_transcription": "他特別留意看天氣預報.",
+    },
 ]
 
-output_audio_path = "examples/audio_enhancement_result.wav"
+# Process each test audio file
+for input_audio in test_audio_files:
+    # Generate output filename based on test audio file
+    test_file_name = os.path.basename(input_audio).replace('.wav', '')
+    output_audio_path = f"examples/audio_enhancement_{test_file_name}_result.wav"
+
+    print(f"\n{'='*60}")
+    print("Audio Enhancement Experiment")
+    print(f"{'='*60}")
+    print(f"Instruction: {instruction}")
+    print(f"Input (to enhance): {input_audio}")
+    print(f"Number of examples: {len(prompt_examples)}")
+    print(f"Output will be saved to: {output_audio_path}")
+    print(f"{'='*60}\n")
+
+    try:
+        text_channel_output = model.in_context_learning_s2s(
+            instruction, 
+            prompt_examples, 
+            input_audio, 
+            max_new_tokens=8192, 
+            output_audio_path=output_audio_path
+        )
+        
+        print(f"\n{'='*60}")
+        print("Experiment completed successfully!")
+        print(f"{'='*60}")
+        print(f"Text channel output: {text_channel_output}")
+        print(f"Enhanced audio saved to: {output_audio_path}")
+        print(f"\nTo listen to the results:")
+        print(f"  Original (LDV):  {input_audio}")
+        print(f"  Enhanced:        {output_audio_path}")
+        
+    except Exception as e:
+        print(f"\n{'='*60}")
+        print("Experiment failed!")
+        print(f"{'='*60}")
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        print(f"Continuing to next test file...\n")
+        continue
 
 print(f"\n{'='*60}")
-print("Audio Enhancement Experiment")
+print("All experiments completed!")
 print(f"{'='*60}")
-print(f"Instruction: {instruction}")
-print(f"Input (to enhance): {input_audio}")
-print(f"Number of examples: {len(prompt_examples)}")
-print(f"Output will be saved to: {output_audio_path}")
-print(f"{'='*60}\n")
-
-try:
-    text_channel_output = model.in_context_learning_s2s(
-        instruction, 
-        prompt_examples, 
-        input_audio, 
-        max_new_tokens=8192, 
-        output_audio_path=output_audio_path
-    )
-    
-    print(f"\n{'='*60}")
-    print("Experiment completed successfully!")
-    print(f"{'='*60}")
-    print(f"Text channel output: {text_channel_output}")
-    print(f"Enhanced audio saved to: {output_audio_path}")
-    print(f"\nTo listen to the results:")
-    print(f"  Original (LDV):  {input_audio}")
-    print(f"  Enhanced:        {output_audio_path}")
-    print(f"  Reference clean: examples/boy1_papercup_clean_001.wav")
-    
-except Exception as e:
-    print(f"\n{'='*60}")
-    print("Experiment failed!")
-    print(f"{'='*60}")
-    print(f"Error: {e}")
-    import traceback
-    traceback.print_exc()
