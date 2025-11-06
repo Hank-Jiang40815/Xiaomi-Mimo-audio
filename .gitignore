@@ -38,5 +38,6 @@ ENV/
 models/
 examples/optical/*/*.wav
 examples/optical_normalized/*/*.wav
+examples/optical_denoised/*/*.wav
 examples/楊老師光路.zip
 examples/audio_enhancement_result*.wav
