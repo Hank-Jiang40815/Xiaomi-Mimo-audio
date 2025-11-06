@@ -17,9 +17,9 @@ instruction = "Enhance the audio quality and remove noise from the input speech.
 # Input: Low-quality audio that we want to enhance
 # Use denoised optical dataset: mix=noisy, spk1=clean (denoised)
 test_audio_files = [
-    "examples/optical_denoised/mix/boy1_WOLDVlean_021.wav",
-    "examples/optical_denoised/mix/boy1_WOLDVlean_022.wav",
-    "examples/optical_denoised/mix/boy1_WOLDVlean_023.wav"
+    "examples/optical_denoised/mix/boy1_WOLDVlean_031.wav",
+    "examples/optical_denoised/mix/boy1_WOLDVlean_032.wav",
+    "examples/optical_denoised/mix/boy1_WOLDVlean_033.wav"
 ]
 
 # Few-shot examples: Demonstrate LDV → clean transformation
@@ -124,6 +124,56 @@ prompt_examples = [
         "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_020.wav",
         "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_020.wav",
         "output_transcription": "他特別留意看天氣預報.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_021.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_021.wav",
+        "output_transcription": "我昨天沒能參加招待會.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_022.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_022.wav",
+        "output_transcription": "我忘了把參考書帶給你.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_023.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_023.wav",
+        "output_transcription": "讓我們約個時間見面吧.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_024.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_024.wav",
+        "output_transcription": "我想和您討論那個計劃.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_025.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_025.wav",
+        "output_transcription": "我有事要和你們經理談.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_026.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_026.wav",
+        "output_transcription": "我要搭乘本週五的飛機.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_027.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_027.wav",
+        "output_transcription": "我要預定三個人的座位.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_028.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_028.wav",
+        "output_transcription": "把這張卡片填好交給我.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_029.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_029.wav",
+        "output_transcription": "每個人需要付十塊台幣.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_030.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_030.wav",
+        "output_transcription": "他為你的考試成績擔心.",
     },
 ]
 
