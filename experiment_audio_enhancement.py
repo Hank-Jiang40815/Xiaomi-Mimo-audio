@@ -17,9 +17,9 @@ instruction = "Enhance the audio quality and remove noise from the input speech.
 # Input: Low-quality audio that we want to enhance
 # Use denoised optical dataset: mix=noisy, spk1=clean (denoised)
 test_audio_files = [
-    "examples/optical_denoised/mix/boy1_WOLDVlean_031.wav",
-    "examples/optical_denoised/mix/boy1_WOLDVlean_032.wav",
-    "examples/optical_denoised/mix/boy1_WOLDVlean_033.wav"
+    "examples/optical_denoised/mix/boy1_WOLDVlean_041.wav",
+    "examples/optical_denoised/mix/boy1_WOLDVlean_042.wav",
+    "examples/optical_denoised/mix/boy1_WOLDVlean_043.wav"
 ]
 
 # Few-shot examples: Demonstrate LDV → clean transformation
@@ -174,6 +174,56 @@ prompt_examples = [
         "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_030.wav",
         "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_030.wav",
         "output_transcription": "他為你的考試成績擔心.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_031.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_031.wav",
+        "output_transcription": "大多數北方人愛吃水餃.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_032.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_032.wav",
+        "output_transcription": "聖誕節前信箱塞滿賀卡.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_033.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_033.wav",
+        "output_transcription": "這個房間裡的燈光很暗.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_034.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_034.wav",
+        "output_transcription": "外面的氣溫是零下十度.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_035.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_035.wav",
+        "output_transcription": "他穿了一件灰格子上衣.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_036.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_036.wav",
+        "output_transcription": "他裝修房子花了三萬塊.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_037.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_037.wav",
+        "output_transcription": "學音樂的人需要些天賦.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_038.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_038.wav",
+        "output_transcription": "大家有事都愛找他商量.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_039.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_039.wav",
+        "output_transcription": "一大早他就在外面掃地.",
+    },
+    {
+        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_040.wav",
+        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_040.wav",
+        "output_transcription": "你出門時別忘了帶鑰匙.",
     },
 ]
 
