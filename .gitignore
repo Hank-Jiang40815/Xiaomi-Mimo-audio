@@ -36,3 +36,7 @@ ENV/
 
 # Model files (download separately)
 models/
+examples/optical/*/*.wav
+examples/optical_normalized/*/*.wav
+examples/楊老師光路.zip
+examples/audio_enhancement_result*.wav
