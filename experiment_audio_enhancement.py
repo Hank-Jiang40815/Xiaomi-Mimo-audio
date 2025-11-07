@@ -3,8 +3,8 @@
 import os
 from src.mimo_audio.mimo_audio import MimoAudio
 
-model_path = "models/MiMo-Audio-7B-Base"
-tokenizer_path = "models/MiMo-Audio-Tokenizer"
+model_path = "/workspace/models/MiMo-Audio-7B-Base"
+tokenizer_path = "/workspace/models/MiMo-Audio-Tokenizer"
 
 print("Loading MiMo-Audio Base model for audio enhancement experiment...")
 model = MimoAudio(model_path, tokenizer_path)
@@ -12,52 +12,55 @@ model = MimoAudio(model_path, tokenizer_path)
 # Experiment: Audio Enhancement / Denoising using In-Context Learning
 # Task: Convert low-quality (LDV) audio to high-quality (clean) audio
 
-instruction = "Enhance the audio quality and remove noise from the input speech. IMPORTANT: You MUST preserve the exact original speech content and transcript. Only improve the audio quality, do not change any words."
+instruction = "Enhance the audio quality and remove noise from the input speech."
 
 # Input: Low-quality audio that we want to enhance
 # Use denoised optical dataset: mix=noisy, spk1=clean (denoised)
 test_audio_files = [
-    "examples/optical_denoised/mix/boy1_WOLDVlean_041.wav",
-    "examples/optical_denoised/mix/boy1_WOLDVlean_042.wav",
-    "examples/optical_denoised/mix/boy1_WOLDVlean_043.wav"
+    "/workspace/examples/optical_denoised/mix/boy1_WOLDVlean_041.wav",
+    "/workspace/examples/optical_denoised/mix/boy1_WOLDVlean_042.wav",
+    "/workspace/examples/optical_denoised/mix/boy1_WOLDVlean_043.wav"
 ]
 
 # Few-shot examples: Demonstrate LDV → clean transformation
 # Note: We only have 2 example pairs, ideally we'd want 3-5 pairs
 prompt_examples = [
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_001.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_001.wav",
+        "input_audio": "/workspace/examples/optical_denoised/mix/boy1_WOLDVlean_001.wav",
+        "output_audio": "/workspace/examples/optical_denoised/spk1/boy1_papercup_clean_001.wav",
         "output_transcription": "這學期學校有書法比賽.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_002.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_002.wav",
+        "input_audio": "/workspace/examples/optical_denoised/mix/boy1_WOLDVlean_002.wav",
+        "output_audio": "/workspace/examples/optical_denoised/spk1/boy1_papercup_clean_002.wav",
         "output_transcription": "公司接到一份國外訂單.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_003.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_003.wav",
+        "input_audio": "/workspace/examples/optical_denoised/mix/boy1_WOLDVlean_003.wav",
+        "output_audio": "/workspace/examples/optical_denoised/spk1/boy1_papercup_clean_003.wav",
         "output_transcription": "他在禮堂主持開幕典禮.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_004.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_004.wav",
+        "input_audio": "/workspace/examples/optical_denoised/mix/boy1_WOLDVlean_004.wav",
+        "output_audio": "/workspace/examples/optical_denoised/spk1/boy1_papercup_clean_004.wav",
         "output_transcription": "這家書店今天正式營業.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_005.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_005.wav",
+        "input_audio": "/workspace/examples/optical_denoised/mix/boy1_WOLDVlean_005.wav",
+        "output_audio": "/workspace/examples/optical_denoised/spk1/boy1_papercup_clean_005.wav",
         "output_transcription": "今年夏天他剃了個光頭.",
     },
 ]
+
+# Experiment tag for output filenames
+experiment_tag = "5shot_minimal_instruction"
 
 # Process each test audio file
 for input_audio in test_audio_files:
     # Generate output filename based on test audio file
     # Add experiment tag to avoid overwriting previous results
     test_file_name = os.path.basename(input_audio).replace('.wav', '')
-    output_audio_path = f"examples/audio_enhancement_{test_file_name}_5shot_no_char_limit_result.wav"
+    output_audio_path = f"/workspace/examples/audio_enhancement_{test_file_name}_{experiment_tag}_result.wav"
 
     print(f"\n{'='*60}")
     print("Audio Enhancement Experiment")
