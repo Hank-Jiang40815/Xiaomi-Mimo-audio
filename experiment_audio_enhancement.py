@@ -17,10 +17,16 @@ instruction = "Enhance the audio quality and remove noise from the input speech.
 
 # Input: Low-quality audio that we want to enhance
 # Use LDV dataset: mix=noisy (LDV), spk=clean
+# Testing special noise variants: x65 and x70 (3 files each)
 test_audio_files = [
-    "examples/ldv/mix/boy1_papercup_LDV_041.wav",
-    "examples/ldv/mix/boy1_papercup_LDV_042.wav",
-    "examples/ldv/mix/boy1_papercup_LDV_043.wav"
+    # x65 series (possibly lower noise level)
+    "examples/ldv/mix/boy1_papercup_LDV_x65_289.wav",
+    "examples/ldv/mix/boy1_papercup_LDV_x65_290.wav",
+    "examples/ldv/mix/boy1_papercup_LDV_x65_291.wav",
+    # x70 series (possibly higher noise level)
+    "examples/ldv/mix/boy1_papercup_LDV_x70_299.wav",
+    "examples/ldv/mix/boy1_papercup_LDV_x70_300.wav",
+    "examples/ldv/mix/boy1_papercup_LDV_x70_301.wav",
 ]
 
 # Few-shot examples: Demonstrate LDV → clean transformation
