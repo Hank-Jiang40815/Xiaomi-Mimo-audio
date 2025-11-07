@@ -11,218 +11,219 @@ model = MimoAudio(model_path, tokenizer_path)
 
 # Experiment: Audio Enhancement / Denoising using In-Context Learning
 # Task: Convert low-quality (LDV) audio to high-quality (clean) audio
+# Dataset: LDV (examples/ldv/) - Original LDV dataset for comparison with optical_denoised
 
-instruction = "Enhance the audio quality and remove noise from the input speech. IMPORTANT: You MUST preserve the exact original speech content and transcript. The speech content is exactly 10 Chinese characters. Only improve the audio quality, do not change any words."
+instruction = "Enhance the audio quality and remove noise from the input speech. IMPORTANT: You MUST preserve the exact original speech content and transcript. Only improve the audio quality, do not change any words."
 
 # Input: Low-quality audio that we want to enhance
-# Use denoised optical dataset: mix=noisy, spk1=clean (denoised)
+# Use LDV dataset: mix=noisy (LDV), spk=clean
 test_audio_files = [
-    "examples/optical_denoised/mix/boy1_WOLDVlean_041.wav",
-    "examples/optical_denoised/mix/boy1_WOLDVlean_042.wav",
-    "examples/optical_denoised/mix/boy1_WOLDVlean_043.wav"
+    "examples/ldv/mix/boy1_papercup_LDV_041.wav",
+    "examples/ldv/mix/boy1_papercup_LDV_042.wav",
+    "examples/ldv/mix/boy1_papercup_LDV_043.wav"
 ]
 
 # Few-shot examples: Demonstrate LDV → clean transformation
-# Note: We only have 2 example pairs, ideally we'd want 3-5 pairs
+# Using 40-shot configuration (001-040) proven effective in previous experiments
 prompt_examples = [
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_001.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_001.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_001.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_001.wav",
         "output_transcription": "這學期學校有書法比賽.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_002.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_002.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_002.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_002.wav",
         "output_transcription": "公司接到一份國外訂單.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_003.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_003.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_003.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_003.wav",
         "output_transcription": "他在禮堂主持開幕典禮.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_004.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_004.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_004.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_004.wav",
         "output_transcription": "這家書店今天正式營業.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_005.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_005.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_005.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_005.wav",
         "output_transcription": "今年夏天他剃了個光頭.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_006.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_006.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_006.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_006.wav",
         "output_transcription": "這群訪客都戴著識別證.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_007.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_007.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_007.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_007.wav",
         "output_transcription": "他聽到這個消息很傷心.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_008.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_008.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_008.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_008.wav",
         "output_transcription": "他在扭傷的腳上敷冰塊.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_009.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_009.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_009.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_009.wav",
         "output_transcription": "這兩個寺廟的香火很盛.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_010.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_010.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_010.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_010.wav",
         "output_transcription": "秘書在幫老闆撰寫文件.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_011.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_011.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_011.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_011.wav",
         "output_transcription": "我今年初一像爸爸拜年.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_012.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_012.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_012.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_012.wav",
         "output_transcription": "我每天早上都要喝杯茶.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_013.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_013.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_013.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_013.wav",
         "output_transcription": "他的名片上有很多頭銜.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_014.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_014.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_014.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_014.wav",
         "output_transcription": "這個市場的東西很便宜.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_015.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_015.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_015.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_015.wav",
         "output_transcription": "我們喜歡看電視連續劇.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_016.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_016.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_016.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_016.wav",
         "output_transcription": "他們非常熟習中國歷史.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_017.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_017.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_017.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_017.wav",
         "output_transcription": "這個人看起來彬彬有禮.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_018.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_018.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_018.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_018.wav",
         "output_transcription": "他的臉上長了很多麻疹.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_019.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_019.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_019.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_019.wav",
         "output_transcription": "他今年七月要參加考試.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_020.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_020.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_020.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_020.wav",
         "output_transcription": "他特別留意看天氣預報.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_021.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_021.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_021.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_021.wav",
         "output_transcription": "我昨天沒能參加招待會.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_022.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_022.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_022.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_022.wav",
         "output_transcription": "我忘了把參考書帶給你.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_023.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_023.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_023.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_023.wav",
         "output_transcription": "讓我們約個時間見面吧.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_024.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_024.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_024.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_024.wav",
         "output_transcription": "我想和您討論那個計劃.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_025.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_025.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_025.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_025.wav",
         "output_transcription": "我有事要和你們經理談.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_026.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_026.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_026.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_026.wav",
         "output_transcription": "我要搭乘本週五的飛機.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_027.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_027.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_027.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_027.wav",
         "output_transcription": "我要預定三個人的座位.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_028.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_028.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_028.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_028.wav",
         "output_transcription": "把這張卡片填好交給我.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_029.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_029.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_029.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_029.wav",
         "output_transcription": "每個人需要付十塊台幣.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_030.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_030.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_030.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_030.wav",
         "output_transcription": "他為你的考試成績擔心.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_031.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_031.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_031.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_031.wav",
         "output_transcription": "大多數北方人愛吃水餃.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_032.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_032.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_032.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_032.wav",
         "output_transcription": "聖誕節前信箱塞滿賀卡.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_033.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_033.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_033.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_033.wav",
         "output_transcription": "這個房間裡的燈光很暗.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_034.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_034.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_034.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_034.wav",
         "output_transcription": "外面的氣溫是零下十度.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_035.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_035.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_035.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_035.wav",
         "output_transcription": "他穿了一件灰格子上衣.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_036.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_036.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_036.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_036.wav",
         "output_transcription": "他裝修房子花了三萬塊.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_037.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_037.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_037.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_037.wav",
         "output_transcription": "學音樂的人需要些天賦.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_038.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_038.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_038.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_038.wav",
         "output_transcription": "大家有事都愛找他商量.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_039.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_039.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_039.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_039.wav",
         "output_transcription": "一大早他就在外面掃地.",
     },
     {
-        "input_audio": "examples/optical_denoised/mix/boy1_WOLDVlean_040.wav",
-        "output_audio": "examples/optical_denoised/spk1/boy1_papercup_clean_040.wav",
+        "input_audio": "examples/ldv/mix/boy1_papercup_LDV_040.wav",
+        "output_audio": "examples/ldv/spk/boy1_papercup_clean_040.wav",
         "output_transcription": "你出門時別忘了帶鑰匙.",
     },
 ]
@@ -230,9 +231,9 @@ prompt_examples = [
 # Process each test audio file
 for input_audio in test_audio_files:
     # Generate output filename based on test audio file
-    # Add experiment tag to avoid overwriting previous results
-    test_file_name = os.path.basename(input_audio).replace('.wav', '')
-    output_audio_path = f"examples/audio_enhancement_{test_file_name}_10chars_constraint_result.wav"
+    # Tag: ldv_40shot to distinguish from optical_denoised experiments
+    test_file_name = os.path.basename(input_audio).replace('.wav', '').replace('boy1_papercup_', '')
+    output_audio_path = f"examples/audio_enhancement_{test_file_name}_ldv_40shot_result.wav"
 
     print(f"\n{'='*60}")
     print("Audio Enhancement Experiment")
