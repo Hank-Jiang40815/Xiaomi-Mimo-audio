@@ -12,7 +12,7 @@ model = MimoAudio(model_path, tokenizer_path)
 # Experiment: Audio Enhancement / Denoising using In-Context Learning
 # Task: Convert low-quality (LDV) audio to high-quality (clean) audio
 
-instruction = "Enhance the audio quality and remove noise from the input speech. IMPORTANT: You MUST preserve the exact original speech content and transcript. The speech content is exactly 10 Chinese characters. Only improve the audio quality, do not change any words."
+instruction = "Enhance the audio quality and remove noise from the input speech. IMPORTANT: You MUST preserve the exact original speech content and transcript. Only improve the audio quality, do not change any words."
 
 # Input: Low-quality audio that we want to enhance
 # Use denoised optical dataset: mix=noisy, spk1=clean (denoised)
@@ -57,7 +57,7 @@ for input_audio in test_audio_files:
     # Generate output filename based on test audio file
     # Add experiment tag to avoid overwriting previous results
     test_file_name = os.path.basename(input_audio).replace('.wav', '')
-    output_audio_path = f"examples/audio_enhancement_{test_file_name}_5shot_strategy5_result.wav"
+    output_audio_path = f"examples/audio_enhancement_{test_file_name}_5shot_no_char_limit_result.wav"
 
     print(f"\n{'='*60}")
     print("Audio Enhancement Experiment")
