@@ -1,0 +1,45 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                   🎯 立即開始使用                                    ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+
+最簡單的用法（只需 1 行指令）
+════════════════════════════════════════════════════════════════════════════
+
+$ ./quick_inference_expA+.sh your_audio.wav
+
+就這樣！輸出會自動儲存到 outputs/enhanced_your_audio.wav
+
+⚠️ 注意: 此腳本會自動在 Docker 容器中執行
+   需確保 Docker 和 mimo-audio:latest image 已安裝
+
+
+完整示範
+════════════════════════════════════════════════════════════════════════════
+
+# 1. 測試 LDV 資料集
+$ ./quick_inference_expA+.sh examples/ldv/mix/boy1_papercup_LDV_041.wav
+
+# 2. 指定輸出位置
+$ ./quick_inference_expA+.sh input.wav results/output.wav
+
+# 3. 批次處理
+$ for f in my_audios/*.wav; do ./quick_inference_expA+.sh "$f"; done
+
+
+配置說明
+════════════════════════════════════════════════════════════════════════════
+  ✓ 使用 Exp(A+) 配置 (commit f56da64)
+  ✓ 40-shot In-Context Learning
+  ✓ 10 字中文內容限制
+  ✓ 基於 optical_denoised 訓練範例
+
+
+需要更多資訊？
+════════════════════════════════════════════════════════════════════════════
+  📖 完整指南:    cat QUICK_INFERENCE_GUIDE.md
+  📋 指令參考:    cat QUICK_INFERENCE_CHEATSHEET.txt
+  ❓ 顯示幫助:    ./quick_inference_expA+.sh
+
+
+開始推論吧！🚀
