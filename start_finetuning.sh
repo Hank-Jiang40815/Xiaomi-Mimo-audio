@@ -59,7 +59,7 @@ docker run --gpus all --rm \
     -w /workspace \
     --shm-size=16g \
     mimo-audio:latest \
-    python finetune_encoder.py \
+    python finetune_encoder_working.py \
         --data_dir ./data/splits/finetune_optical \
         --tokenizer_path ./models/MiMo-Audio-Tokenizer \
         --output_dir "$OUTPUT_DIR" \
@@ -68,9 +68,6 @@ docker run --gpus all --rm \
         --epochs "$EPOCHS" \
         --batch_size "$BATCH_SIZE" \
         --lr "$LEARNING_RATE" \
-        --weight_decay 0.01 \
-        --warmup_steps 100 \
-        --save_steps 500 \
         --device cuda
 
 echo
