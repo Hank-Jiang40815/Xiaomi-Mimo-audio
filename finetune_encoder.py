@@ -1,423 +1,364 @@
 #!/usr/bin/env python3
-"""
-MiMo-Audio Encoder Fine-tuning Script
-針對嚴重噪聲場景微調 Encoder
-
-使用 LoRA (Low-Rank Adaptation) 進行高效微調
-重點：Audio Tokenizer 的 Encoder 部分
-"""
+# -*- coding: utf-8 -*-
+"""Fine-tune MiMo-Audio Encoder with LoRA"""
 
 import os
+import sys
 import argparse
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-from transformers import get_linear_schedule_with_warmup
 from pathlib import Path
 import json
+import torchaudio
 from tqdm import tqdm
 import logging
-from datetime import datetime
 
-# 設置 logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+sys.path.insert(0, str(Path(__file__).parent))
+from src.mimo_audio_tokenizer import MiMoAudioTokenizer
 
-class AudioPairDataset(Dataset):
-    """
-    音訊配對資料集
-    - noisy_audio: 噪聲音訊路徑
-    - clean_audio: 乾淨音訊路徑
-    """
-    def __init__(self, data_dir, split='train'):
-        self.data_dir = Path(data_dir)
-        self.split = split
+
+class OpticalDataset(Dataset):
+    def __init__(self, split_file: str, max_duration: float = 10.0, sample_rate: int = 24000):
+        self.split_file = Path(split_file)
+        self.max_duration = max_duration
+        self.sample_rate = sample_rate
+        self.max_length = int(max_duration * sample_rate)
         
-        # 優先載入 split_selector 生成的格式
-        split_file = self.data_dir / f"{split}.json"
-        if split_file.exists():
-            with open(split_file, 'r') as f:
-                split_data = json.load(f)
-            # 檢查是否是 split_selector 格式（有 'samples' 鍵）
-            if 'samples' in split_data:
-                self.pairs = self._load_from_manifest_split(split_data)
-                logger.info(f"Loaded {len(self.pairs)} pairs from manifest split")
-            else:
-                self.pairs = split_data
-                logger.info(f"Loaded {len(self.pairs)} pairs from legacy format")
-        else:
-            # 舊格式：{split}_pairs.json
-            pair_file = self.data_dir / f"{split}_pairs.json"
-            if pair_file.exists():
-                with open(pair_file, 'r') as f:
-                    self.pairs = json.load(f)
-                logger.info(f"Loaded {len(self.pairs)} pairs from {pair_file}")
-            else:
-                # 自動掃描配對
-                self.pairs = self._auto_scan_pairs()
-                logger.info(f"Auto-scanned {len(self.pairs)} pairs")
-    
-    def _load_from_manifest_split(self, split_data):
-        """從 split_selector 生成的 manifest 格式載入"""
-        pairs = []
-        for sample in split_data['samples']:
-            pairs.append({
-                'noisy': sample['noisy_file'],
-                'clean': sample['clean_file'],
-                'text': sample.get('text', ''),
-                'speaker': sample.get('speaker', ''),
-                'id': sample.get('id', '')
-            })
-        return pairs
-    
-    def _auto_scan_pairs(self):
-        """自動掃描 mix/ 和 spk/ 目錄找配對"""
-        pairs = []
-        mix_dir = self.data_dir / "mix"
-        spk_dir = self.data_dir / "spk1"
+        # 建立 Mel Spectrogram 轉換器（與 MiMo-Audio-Tokenizer 配置一致）
+        self.mel_transform = torchaudio.transforms.MelSpectrogram(
+            sample_rate=sample_rate,
+            n_fft=1024,
+            hop_length=240,
+            n_mels=128,
+            f_min=0.0,
+            f_max=float(sample_rate // 2)
+        )
         
-        if mix_dir.exists() and spk_dir.exists():
-            for mix_file in sorted(mix_dir.glob("*.wav")):
-                # 找對應的乾淨音訊
-                base_name = mix_file.stem
-                spk_file = spk_dir / f"{base_name}.wav"
-                
-                if spk_file.exists():
-                    pairs.append({
-                        "noisy": str(mix_file),
-                        "clean": str(spk_file)
-                    })
+        if not self.split_file.exists():
+            raise FileNotFoundError(f"Split file not found: {split_file}")
         
-        return pairs
+        with open(self.split_file, 'r', encoding='utf-8') as f:
+            split_data = json.load(f)
+        
+        self.samples = split_data.get('samples', [])
+        if not self.samples:
+            raise ValueError(f"No samples found in {split_file}")
+        
+        logger.info(f"Loaded {len(self.samples)} samples from {self.split_file.name}")
     
     def __len__(self):
-        return len(self.pairs)
+        return len(self.samples)
+    
+    def load_and_preprocess_audio(self, path: str) -> torch.Tensor:
+        """載入音訊並轉換為 mel spectrogram"""
+        waveform, sr = torchaudio.load(path)
+        
+        # 重新採樣到 24kHz
+        if sr != self.sample_rate:
+            resampler = torchaudio.transforms.Resample(sr, self.sample_rate)
+            waveform = resampler(waveform)
+        
+        # 轉換為 mono
+        if waveform.shape[0] > 1:
+            waveform = waveform.mean(dim=0, keepdim=True)
+        
+        # 截斷或填充到固定長度
+        if waveform.shape[1] > self.max_length:
+            waveform = waveform[:, :self.max_length]
+        else:
+            pad_length = self.max_length - waveform.shape[1]
+            waveform = F.pad(waveform, (0, pad_length), value=0.0)
+        
+        # 轉換為 mel spectrogram: [1, n_mels, time]
+        mel_spec = self.mel_transform(waveform)
+        
+        return mel_spec.squeeze(0)  # [n_mels, time]
     
     def __getitem__(self, idx):
-        pair = self.pairs[idx]
-        return {
-            'noisy_path': pair['noisy'],
-            'clean_path': pair['clean']
-        }
+        sample = self.samples[idx]
+        
+        try:
+            noisy_audio = self.load_and_preprocess_audio(sample['noisy_file'])
+            clean_audio = self.load_and_preprocess_audio(sample['clean_file'])
+            
+            return {
+                'noisy_audio': noisy_audio,
+                'clean_audio': clean_audio,
+                'sample_id': sample.get('id', str(idx)),
+                'transcription': sample.get('transcription', '')
+            }
+        except Exception as e:
+            logger.error(f"Error loading sample {idx}: {e}")
+            # 返回與 mel spectrogram 形狀一致的零張量 [n_mels, time]
+            mel_time = (self.max_length // 240) + 1  # hop_length = 240
+            return {
+                'noisy_audio': torch.zeros(128, mel_time),
+                'clean_audio': torch.zeros(128, mel_time),
+                'sample_id': f'error_{idx}',
+                'transcription': ''
+            }
 
 
 class LoRALayer(nn.Module):
-    """
-    LoRA (Low-Rank Adaptation) Layer
-    
-    對原始權重矩陣 W 添加低秩分解: W' = W + BA
-    其中 B: (d_out, r), A: (r, d_in), r << min(d_in, d_out)
-    """
-    def __init__(self, original_layer, rank=8, alpha=16):
+    def __init__(self, in_features: int, out_features: int, rank: int = 8, alpha: float = 16.0, dropout: float = 0.0):
         super().__init__()
-        self.original_layer = original_layer
         self.rank = rank
         self.alpha = alpha
-        
-        # 凍結原始層
-        for param in self.original_layer.parameters():
-            param.requires_grad = False
-        
-        # 獲取原始層的輸入輸出維度
-        if hasattr(original_layer, 'in_features'):
-            d_in = original_layer.in_features
-            d_out = original_layer.out_features
-        elif hasattr(original_layer, 'in_channels'):
-            d_in = original_layer.in_channels
-            d_out = original_layer.out_channels
-        else:
-            raise ValueError("Unsupported layer type for LoRA")
-        
-        # LoRA 矩陣
-        self.lora_A = nn.Parameter(torch.randn(rank, d_in) * 0.01)
-        self.lora_B = nn.Parameter(torch.zeros(d_out, rank))
-        
         self.scaling = alpha / rank
+        
+        self.lora_A = nn.Parameter(torch.randn(rank, in_features) * 0.01)
+        self.lora_B = nn.Parameter(torch.zeros(out_features, rank))
+        
+        self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
     
-    def forward(self, x):
-        # 原始輸出
-        result = self.original_layer(x)
-        
-        # LoRA 調整
-        if isinstance(self.original_layer, nn.Linear):
-            lora_adjustment = (x @ self.lora_A.T @ self.lora_B.T) * self.scaling
-        else:
-            # 對於 Conv 層的處理
-            lora_adjustment = torch.nn.functional.conv1d(
-                x, 
-                (self.lora_B @ self.lora_A).unsqueeze(-1),
-                bias=None
-            ) * self.scaling
-        
-        return result + lora_adjustment
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        result = self.dropout(x) @ self.lora_A.T @ self.lora_B.T
+        return result * self.scaling
 
 
-def apply_lora_to_encoder(tokenizer_model, rank=8, alpha=16):
+def inject_lora_to_encoder(encoder: nn.Module, rank: int = 8, alpha: float = 16.0):
+    lora_modules = {}
+    
+    # First, collect all modules that need LoRA (convert to list to avoid iterator issues)
+    modules_to_modify = []
+    for name, module in list(encoder.named_modules()):
+        if isinstance(module, nn.Linear) and any(keyword in name for keyword in ['attn', 'fc1', 'fc2', 'mlp']):
+            modules_to_modify.append((name, module))
+    
+    logger.info(f"Found {len(modules_to_modify)} linear layers to inject LoRA")
+    
+    # Now modify them
+    for name, module in modules_to_modify:
+        lora = LoRALayer(
+            in_features=module.in_features,
+            out_features=module.out_features,
+            rank=rank,
+            alpha=alpha
+        )
+        
+        # 將 LoRA 層移到與原始模組相同的 device
+        lora = lora.to(module.weight.device)
+        
+        module.weight.requires_grad = False
+        if module.bias is not None:
+            module.bias.requires_grad = False
+        
+        # Store lora module reference
+        lora_modules[name] = lora
+        
+        # Monkey-patch the forward method
+        original_forward = module.forward
+        
+        def make_forward_with_lora(orig_forward, lora_layer):
+            def forward_with_lora(x):
+                base_output = orig_forward(x)
+                lora_output = lora_layer(x)
+                return base_output + lora_output
+            return forward_with_lora
+        
+        module.forward = make_forward_with_lora(original_forward, lora)
+        
+        # Register LoRA parameters directly to the module
+        module.lora_A = lora.lora_A
+        module.lora_B = lora.lora_B
+    
+    logger.info(f"Injected LoRA to {len(lora_modules)} linear layers (rank={rank}, alpha={alpha})")
+    
+    return lora_modules
+
+
+def compute_feature_matching_loss(encoder: nn.Module, noisy_mel: torch.Tensor, clean_mel: torch.Tensor, device) -> torch.Tensor:
     """
-    對 Audio Tokenizer 的 Encoder 應用 LoRA
+    計算特徵匹配損失（簡化版本）
+    目標：讓 encoder 從噪音音訊中提取的特徵接近乾淨音訊的特徵
     
     Args:
-        tokenizer_model: MiMo Audio Tokenizer model
-        rank: LoRA rank
-        alpha: LoRA alpha (scaling factor)
+        encoder: Audio Encoder
+        noisy_mel: [batch, n_mels, time] 噪音 mel spectrogram
+        clean_mel: [batch, n_mels, time] 乾淨 mel spectrogram
     """
-    logger.info(f"Applying LoRA to encoder (rank={rank}, alpha={alpha})")
+    batch_size = noisy_mel.shape[0]
+    mel_len = noisy_mel.shape[2]
     
-    # 找到 encoder 的所有線性層和卷積層
-    lora_layers = []
+    # 計算 mel 長度
+    mel_lens = torch.tensor([mel_len] * batch_size, device=device, dtype=torch.long)
     
-    if hasattr(tokenizer_model, 'encoder'):
-        encoder = tokenizer_model.encoder
+    with torch.cuda.amp.autocast(enabled=True, dtype=torch.bfloat16):
+        # 編碼噪音音訊（允許梯度）- 轉換為 bfloat16
+        noisy_features = encoder.get_features(
+            input_features=noisy_mel.to(torch.bfloat16),  # [batch, n_mels, time]
+            output_length=encoder.get_output_length(mel_lens)
+        )[0]  # 只取 hidden_states
         
-        for name, module in encoder.named_modules():
-            if isinstance(module, (nn.Linear, nn.Conv1d)):
-                # 替換為 LoRA 層
-                parent_name = '.'.join(name.split('.')[:-1])
-                child_name = name.split('.')[-1]
-                
-                if parent_name:
-                    parent = dict(encoder.named_modules())[parent_name]
-                else:
-                    parent = encoder
-                
-                lora_layer = LoRALayer(module, rank=rank, alpha=alpha)
-                setattr(parent, child_name, lora_layer)
-                lora_layers.append(lora_layer)
-                
-                logger.info(f"Applied LoRA to: {name}")
+        # 編碼乾淨音訊（作為目標，不需要梯度）
+        with torch.no_grad():
+            clean_features = encoder.get_features(
+                input_features=clean_mel.to(torch.bfloat16),
+                output_length=encoder.get_output_length(mel_lens)
+            )[0]
+        
+        # 計算特徵空間的 MSE 損失
+        loss = F.mse_loss(noisy_features, clean_features)
     
-    logger.info(f"Total LoRA layers applied: {len(lora_layers)}")
-    return lora_layers
+    return loss
 
 
-def compute_reconstruction_loss(noisy_tokens, clean_tokens):
-    """
-    計算重建損失
-    
-    Args:
-        noisy_tokens: 噪聲音訊的 token representation
-        clean_tokens: 乾淨音訊的 token representation
-    """
-    # L1 loss (更適合音訊重建)
-    l1_loss = nn.functional.l1_loss(noisy_tokens, clean_tokens)
-    
-    # MSE loss
-    mse_loss = nn.functional.mse_loss(noisy_tokens, clean_tokens)
-    
-    # 組合損失
-    total_loss = 0.7 * l1_loss + 0.3 * mse_loss
-    
-    return total_loss, {'l1': l1_loss.item(), 'mse': mse_loss.item()}
-
-
-def train_epoch(model, dataloader, optimizer, scheduler, device, epoch):
-    """訓練一個 epoch"""
+def train_one_epoch(model, dataloader, optimizer, device, epoch, gradient_accumulation_steps=1):
     model.train()
-    total_loss = 0
+    total_loss = 0.0
+    num_batches = 0
     
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch}")
     
+    optimizer.zero_grad()
+    
     for batch_idx, batch in enumerate(progress_bar):
-        noisy_paths = batch['noisy_path']
-        clean_paths = batch['clean_path']
+        noisy_audio = batch['noisy_audio'].to(device)
+        clean_audio = batch['clean_audio'].to(device)
         
-        # TODO: 載入和預處理音訊
-        # 這裡需要根據實際的音訊載入方式來實現
-        # noisy_audio = load_audio(noisy_paths)
-        # clean_audio = load_audio(clean_paths)
+        loss = compute_feature_matching_loss(model.encoder, noisy_audio, clean_audio, device)
         
-        # 前向傳播（通過 encoder）
-        # noisy_tokens = model.encode(noisy_audio)
-        # clean_tokens = model.encode(clean_audio)
+        loss = loss / gradient_accumulation_steps
+        loss.backward()
         
-        # 計算損失
-        # loss, loss_dict = compute_reconstruction_loss(noisy_tokens, clean_tokens)
+        if (batch_idx + 1) % gradient_accumulation_steps == 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            optimizer.step()
+            optimizer.zero_grad()
         
-        # 反向傳播
-        optimizer.zero_grad()
-        # loss.backward()
-        # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        # optimizer.step()
-        # scheduler.step()
+        total_loss += loss.item() * gradient_accumulation_steps
+        num_batches += 1
         
-        # total_loss += loss.item()
-        
-        # 更新進度條
         progress_bar.set_postfix({
-            'loss': f"{total_loss/(batch_idx+1):.4f}"
+            'loss': f'{loss.item() * gradient_accumulation_steps:.4f}',
+            'avg_loss': f'{total_loss / num_batches:.4f}'
         })
     
-    return total_loss / len(dataloader)
+    avg_loss = total_loss / num_batches
+    return avg_loss
 
 
+@torch.no_grad()
 def validate(model, dataloader, device):
-    """驗證"""
     model.eval()
-    total_loss = 0
+    total_loss = 0.0
+    num_batches = 0
     
-    with torch.no_grad():
-        for batch in tqdm(dataloader, desc="Validating"):
-            noisy_paths = batch['noisy_path']
-            clean_paths = batch['clean_path']
-            
-            # TODO: 同上，實現音訊載入和驗證邏輯
-            pass
+    for batch in tqdm(dataloader, desc="Validation"):
+        noisy_audio = batch['noisy_audio'].to(device)
+        clean_audio = batch['clean_audio'].to(device)
+        
+        loss = compute_feature_matching_loss(model.encoder, noisy_audio, clean_audio, device)
+        
+        total_loss += loss.item()
+        num_batches += 1
     
-    return total_loss / len(dataloader) if len(dataloader) > 0 else 0
+    avg_loss = total_loss / num_batches
+    return avg_loss
+
+
+def save_checkpoint(model, optimizer, epoch, loss, save_dir, is_best=False):
+    save_dir = Path(save_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
+    
+    lora_state_dict = {}
+    for name, param in model.named_parameters():
+        if 'lora' in name and param.requires_grad:
+            lora_state_dict[name] = param.cpu()
+    
+    checkpoint = {
+        'epoch': epoch,
+        'lora_state_dict': lora_state_dict,
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': loss,
+    }
+    
+    checkpoint_path = save_dir / f'checkpoint_epoch_{epoch}.pt'
+    torch.save(checkpoint, checkpoint_path)
+    logger.info(f"Saved checkpoint: {checkpoint_path}")
+    
+    if is_best:
+        best_path = save_dir / 'best_model.pt'
+        torch.save(checkpoint, best_path)
+        logger.info(f"Saved best model: {best_path}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Fine-tune MiMo-Audio Encoder")
+    parser = argparse.ArgumentParser(description='Fine-tune MiMo-Audio Encoder with LoRA')
     
-    # 資料相關
-    parser.add_argument('--data_dir', type=str, required=True,
-                        help='訓練資料目錄 (包含 mix/ 和 spk1/ 子目錄)')
-    parser.add_argument('--val_data_dir', type=str, default=None,
-                        help='驗證資料目錄')
-    
-    # 模型相關
-    parser.add_argument('--tokenizer_path', type=str, 
-                        default='./models/MiMo-Audio-Tokenizer',
-                        help='Audio Tokenizer 模型路徑')
-    parser.add_argument('--output_dir', type=str, 
-                        default='./outputs/finetune_encoder',
-                        help='輸出目錄')
-    
-    # LoRA 參數
-    parser.add_argument('--lora_rank', type=int, default=8,
-                        help='LoRA rank (default: 8)')
-    parser.add_argument('--lora_alpha', type=int, default=16,
-                        help='LoRA alpha (default: 16)')
-    
-    # 訓練參數
-    parser.add_argument('--batch_size', type=int, default=4,
-                        help='Batch size')
-    parser.add_argument('--epochs', type=int, default=10,
-                        help='訓練輪數')
-    parser.add_argument('--lr', type=float, default=1e-4,
-                        help='Learning rate')
-    parser.add_argument('--warmup_steps', type=int, default=100,
-                        help='Warmup steps')
-    parser.add_argument('--weight_decay', type=float, default=0.01,
-                        help='Weight decay')
-    
-    # 其他
-    parser.add_argument('--device', type=str, default='cuda',
-                        help='Device (cuda/cpu)')
-    parser.add_argument('--save_steps', type=int, default=500,
-                        help='每多少步保存一次')
+    parser.add_argument('--train-split', type=str, required=True, help='Training split JSON file')
+    parser.add_argument('--val-split', type=str, required=True, help='Validation split JSON file')
+    parser.add_argument('--tokenizer-path', type=str, default='./models/MiMo-Audio-Tokenizer', help='Path to MiMo-Audio-Tokenizer')
+    parser.add_argument('--lora-rank', type=int, default=8, help='LoRA rank')
+    parser.add_argument('--lora-alpha', type=float, default=16.0, help='LoRA alpha')
+    parser.add_argument('--batch-size', type=int, default=4, help='Batch size')
+    parser.add_argument('--gradient-accumulation-steps', type=int, default=4, help='Gradient accumulation steps')
+    parser.add_argument('--epochs', type=int, default=10, help='Number of epochs')
+    parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
+    parser.add_argument('--weight-decay', type=float, default=0.01, help='Weight decay')
+    parser.add_argument('--output-dir', type=str, default='./outputs/finetune_encoder', help='Output directory')
+    parser.add_argument('--num-workers', type=int, default=4, help='Number of data loading workers')
     
     args = parser.parse_args()
     
-    # 創建輸出目錄
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # 保存配置
-    with open(output_dir / 'config.json', 'w') as f:
-        json.dump(vars(args), f, indent=2)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logger.info(f"Using device: {device}")
     
-    logger.info("=" * 80)
-    logger.info("MiMo-Audio Encoder Fine-tuning")
-    logger.info("=" * 80)
-    logger.info(f"Output directory: {output_dir}")
-    logger.info(f"Data directory: {args.data_dir}")
-    logger.info(f"LoRA rank: {args.lora_rank}, alpha: {args.lora_alpha}")
-    logger.info(f"Batch size: {args.batch_size}, Epochs: {args.epochs}")
-    logger.info(f"Learning rate: {args.lr}")
+    logger.info(f"Loading tokenizer from {args.tokenizer_path}")
+    tokenizer = MiMoAudioTokenizer.from_pretrained(args.tokenizer_path)
+    tokenizer = tokenizer.to(device)
     
-    # TODO: 載入 Audio Tokenizer
-    # from src.mimo_audio_tokenizer import AudioTokenizer
-    # tokenizer_model = AudioTokenizer.from_pretrained(args.tokenizer_path)
-    # tokenizer_model = tokenizer_model.to(args.device)
+    # 將模型轉換為 bfloat16 以支援 Flash Attention
+    tokenizer = tokenizer.to(torch.bfloat16)
     
-    # 應用 LoRA
-    # lora_layers = apply_lora_to_encoder(
-    #     tokenizer_model, 
-    #     rank=args.lora_rank, 
-    #     alpha=args.lora_alpha
-    # )
+    logger.info("Injecting LoRA to encoder...")
+    lora_modules = inject_lora_to_encoder(tokenizer.encoder, rank=args.lora_rank, alpha=args.lora_alpha)
     
-    # 準備資料
-    train_dataset = AudioPairDataset(args.data_dir, split='train')
-    train_loader = DataLoader(
-        train_dataset, 
-        batch_size=args.batch_size,
-        shuffle=True,
-        num_workers=4
-    )
+    trainable_params = sum(p.numel() for p in tokenizer.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in tokenizer.parameters())
+    logger.info(f"Trainable parameters: {trainable_params:,} / {total_params:,} ({100 * trainable_params / total_params:.2f}%)")
     
-    if args.val_data_dir:
-        val_dataset = AudioPairDataset(args.val_data_dir, split='val')
-        val_loader = DataLoader(
-            val_dataset,
-            batch_size=args.batch_size,
-            shuffle=False,
-            num_workers=4
-        )
-    else:
-        val_loader = None
+    logger.info("Loading datasets...")
+    train_dataset = OpticalDataset(args.train_split)
+    val_dataset = OpticalDataset(args.val_split)
     
-    # 優化器和調度器
-    # trainable_params = [p for p in tokenizer_model.parameters() if p.requires_grad]
-    # optimizer = torch.optim.AdamW(
-    #     trainable_params,
-    #     lr=args.lr,
-    #     weight_decay=args.weight_decay
-    # )
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
     
-    # total_steps = len(train_loader) * args.epochs
-    # scheduler = get_linear_schedule_with_warmup(
-    #     optimizer,
-    #     num_warmup_steps=args.warmup_steps,
-    #     num_training_steps=total_steps
-    # )
+    optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, tokenizer.parameters()), lr=args.lr, weight_decay=args.weight_decay)
     
-    # 訓練循環
-    # best_val_loss = float('inf')
+    logger.info("Starting training...")
+    best_val_loss = float('inf')
     
-    # for epoch in range(1, args.epochs + 1):
-    #     logger.info(f"\nEpoch {epoch}/{args.epochs}")
+    for epoch in range(1, args.epochs + 1):
+        logger.info(f"\n{'='*50}")
+        logger.info(f"Epoch {epoch}/{args.epochs}")
+        logger.info(f"{'='*50}")
         
-    #     # 訓練
-    #     train_loss = train_epoch(
-    #         tokenizer_model, train_loader, optimizer, scheduler,
-    #         args.device, epoch
-    #     )
-    #     logger.info(f"Train Loss: {train_loss:.4f}")
+        train_loss = train_one_epoch(tokenizer, train_loader, optimizer, device, epoch, args.gradient_accumulation_steps)
+        logger.info(f"Train Loss: {train_loss:.4f}")
         
-    #     # 驗證
-    #     if val_loader:
-    #         val_loss = validate(tokenizer_model, val_loader, args.device)
-    #         logger.info(f"Val Loss: {val_loss:.4f}")
-            
-    #         # 保存最佳模型
-    #         if val_loss < best_val_loss:
-    #             best_val_loss = val_loss
-    #             save_path = output_dir / 'best_model'
-    #             tokenizer_model.save_pretrained(save_path)
-    #             logger.info(f"Saved best model to {save_path}")
+        val_loss = validate(tokenizer, val_loader, device)
+        logger.info(f"Val Loss: {val_loss:.4f}")
         
-    #     # 定期保存
-    #     if epoch % 2 == 0:
-    #         save_path = output_dir / f'checkpoint_epoch_{epoch}'
-    #         tokenizer_model.save_pretrained(save_path)
-    #         logger.info(f"Saved checkpoint to {save_path}")
+        is_best = val_loss < best_val_loss
+        if is_best:
+            best_val_loss = val_loss
+        
+        save_checkpoint(tokenizer, optimizer, epoch, val_loss, output_dir, is_best=is_best)
     
-    logger.info("\n" + "=" * 80)
-    logger.info("Training completed!")
-    logger.info("=" * 80)
-    
-    logger.info("\n⚠️  注意: 這是一個框架腳本，需要根據實際的模型 API 來完成實現")
-    logger.info("主要需要實現的部分:")
-    logger.info("  1. 載入 Audio Tokenizer 模型")
-    logger.info("  2. 音訊載入和預處理")
-    logger.info("  3. Encoder 的前向傳播")
-    logger.info("  4. 完整的訓練和驗證循環")
+    logger.info(f"\n{'='*50}")
+    logger.info(f"Training completed! Best validation loss: {best_val_loss:.4f}")
+    logger.info(f"Checkpoints saved to: {output_dir}")
 
 
 if __name__ == '__main__':
