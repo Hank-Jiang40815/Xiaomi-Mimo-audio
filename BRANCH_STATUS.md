@@ -35,16 +35,23 @@
   - For model inference and training
   - Clean host environment (no ML packages)
 
-### 3. Fine-tuning Framework
+### 3. Fine-tuning Framework ⭐ NEW
 - ✅ **Core Scripts**:
-  - `finetune_encoder.py`: Main training script with LoRA
+  - `finetune_encoder.py`: Main training script with LoRA (✅ **已除錯完成**)
   - `finetune_input_local.py`: Input processing utilities
   - `prepare_training_data.py`: Dataset preparation tool
   
 - ✅ **Documentation**:
+  - `FINETUNE_QUICKSTART.md`: 快速開始指南 ⭐ **NEW**
+  - `FINETUNE_ENCODER_DEBUGGING_LOG.md`: 完整除錯紀錄 ⭐ **NEW**
   - `FINETUNE_README.md`: Quick start guide
   - `FINETUNING_GUIDE.md`: Detailed fine-tuning guide
   - `FINETUNE_ARCHITECTURE_ANALYSIS.md`: Technical analysis
+
+- ✅ **成功測試** (2025-11-13):
+  - Train Loss: 14.27 | Val Loss: 14.90
+  - 訓練速度: 5.89 it/s
+  - 可訓練參數: 661M / 1290M (51.22%)
 
 ### 4. Data Management Tools
 All in `scripts/data_management/`:
@@ -96,43 +103,63 @@ All data management work is now available on `feat/finetune-encoder` branch.
 
 ---
 
-## 🎯 Next Steps for Fine-tuning
+## 🎯 Current Status & Next Steps
 
-1. **Prepare Training Data**:
-   ```bash
-   python prepare_training_data.py \
-       --source_dir ./examples/optical \
-       --output_dir ./data/finetune_optical \
-       --train_ratio 0.8
-   ```
+### ✅ 完成項目 (2025-11-13)
 
-2. **Start Fine-tuning**:
-   ```bash
-   python finetune_encoder.py \
-       --data_dir ./data/finetune_optical \
-       --output_dir ./outputs/optical_lora \
-       --epochs 10 \
-       --batch_size 4 \
-       --lora_r 16
-   ```
+1. **Fine-tuning 腳本除錯** ✅
+   - 解決 5 個關鍵問題（詳見 `FINETUNE_ENCODER_DEBUGGING_LOG.md`）
+   - 成功運行測試：Train Loss 14.27, Val Loss 14.90
+   - 確認輸入格式：Mel Spectrogram (128 bands)
+   - 確認 dtype: bfloat16 (支援 Flash Attention)
 
-3. **Monitor Training**:
-   - Check logs in `outputs/optical_lora/`
-   - Validation loss and reconstruction quality
+2. **文檔完善** ✅
+   - 建立除錯紀錄：`FINETUNE_ENCODER_DEBUGGING_LOG.md`
+   - 建立快速指南：`FINETUNE_QUICKSTART.md`
+   - 更新分支狀態文件
 
-4. **Test Enhanced Model**:
-   - Use test set from `data/finetune_optical/val/`
-   - Compare with baseline (non-fine-tuned)
+### 🔜 下一步行動
+
+**選項 A: 立即開始正式訓練**
+```bash
+docker run --gpus all --rm -v "$(pwd)":/workspace -w /workspace \
+    mimo-audio:latest python finetune_encoder.py \
+    --train-split data/splits/finetune_optical/train.json \
+    --val-split data/splits/finetune_optical/val.json \
+    --batch-size 4 --gradient-accumulation-steps 4 \
+    --epochs 10 --lora-rank 16 \
+    --output-dir ./outputs/optical_lora_r16
+```
+
+**選項 B: 先執行 ICL baseline 測試**
+```bash
+bash batch_test_optical_icl.sh  # 測試 1, 3, 5, 10 shot
+```
+
+**選項 C: 實驗對比**
+- 測試不同 LoRA rank (8, 16, 32)
+- 比較 ICL vs Fine-tuning
+- 評估不同 loss function
 
 ---
 
 ## 📝 Important Notes
 
-- **Token Space Preserved**: Encoder fine-tuning doesn't change RVQ tokens (0-1023)
-- **LoRA Efficiency**: Only ~1-5% parameters are trainable
-- **Text Annotations**: Available for all optical dataset samples (useful for prompts)
-- **Environment**: Use Docker containers for isolation
-- **Git LFS**: Audio files are tracked with Git LFS
+### 訓練相關
+- **輸入格式**: Mel Spectrogram (128 bands, hop=240, sr=24kHz) ⚠️ 不是原始波形
+- **資料型別**: bfloat16 (Flash Attention 要求)
+- **LoRA 效率**: 51.22% 參數可訓練 (661M / 1290M)
+- **Token Space**: Encoder fine-tuning 不改變 RVQ tokens (0-1023)
+
+### 環境相關
+- **Docker**: 必須使用 `mimo-audio:latest` 容器
+- **GPU**: 建議使用 RTX 3090 以上 (需要 >16GB VRAM)
+- **Git LFS**: 音訊檔案使用 Git LFS 追蹤
+
+### 資料相關
+- **Text Annotations**: 所有 optical 樣本都有文字標註
+- **資料分割**: 已建立 train/val/test splits
+- **配對率**: 100% (3456/3456)
 
 ---
 
