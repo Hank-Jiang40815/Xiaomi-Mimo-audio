@@ -37,16 +37,42 @@ class AudioPairDataset(Dataset):
         self.data_dir = Path(data_dir)
         self.split = split
         
-        # 載入配對資訊
-        pair_file = self.data_dir / f"{split}_pairs.json"
-        if pair_file.exists():
-            with open(pair_file, 'r') as f:
-                self.pairs = json.load(f)
+        # 優先載入 split_selector 生成的格式
+        split_file = self.data_dir / f"{split}.json"
+        if split_file.exists():
+            with open(split_file, 'r') as f:
+                split_data = json.load(f)
+            # 檢查是否是 split_selector 格式（有 'samples' 鍵）
+            if 'samples' in split_data:
+                self.pairs = self._load_from_manifest_split(split_data)
+                logger.info(f"Loaded {len(self.pairs)} pairs from manifest split")
+            else:
+                self.pairs = split_data
+                logger.info(f"Loaded {len(self.pairs)} pairs from legacy format")
         else:
-            # 自動掃描配對
-            self.pairs = self._auto_scan_pairs()
-        
-        logger.info(f"Loaded {len(self.pairs)} pairs for {split} split")
+            # 舊格式：{split}_pairs.json
+            pair_file = self.data_dir / f"{split}_pairs.json"
+            if pair_file.exists():
+                with open(pair_file, 'r') as f:
+                    self.pairs = json.load(f)
+                logger.info(f"Loaded {len(self.pairs)} pairs from {pair_file}")
+            else:
+                # 自動掃描配對
+                self.pairs = self._auto_scan_pairs()
+                logger.info(f"Auto-scanned {len(self.pairs)} pairs")
+    
+    def _load_from_manifest_split(self, split_data):
+        """從 split_selector 生成的 manifest 格式載入"""
+        pairs = []
+        for sample in split_data['samples']:
+            pairs.append({
+                'noisy': sample['noisy_file'],
+                'clean': sample['clean_file'],
+                'text': sample.get('text', ''),
+                'speaker': sample.get('speaker', ''),
+                'id': sample.get('id', '')
+            })
+        return pairs
     
     def _auto_scan_pairs(self):
         """自動掃描 mix/ 和 spk/ 目錄找配對"""
