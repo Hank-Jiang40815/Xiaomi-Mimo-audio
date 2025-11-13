@@ -51,12 +51,13 @@ def extract_info_from_filename(filename: str, dataset: str) -> Dict[str, Optiona
             info["sentence_id"] = match.group(4)  # 第4組是編號
     
     elif dataset.startswith("optical"):
-        # 格式: boy1_WOLDVlean_001.wav
-        match = re.match(r'(boy\d+)_([A-Za-z]+)_(\d+)\.wav', filename)
+        # Mix (noisy) 格式: boy1_WOLDV_001.wav, girl1_WOLDV_001.wav
+        # Spk1 (clean) 格式: boy1_WOLDV_clean_001.wav, girl1_WOLDV_clean_001.wav
+        match = re.match(r'((boy|girl)\d+)_([A-Za-z]+)_(clean_)?(\d+)\.wav', filename)
         if match:
             info["speaker"] = match.group(1)
-            info["noise_type"] = match.group(2)
-            info["sentence_id"] = match.group(3)
+            info["noise_type"] = match.group(3)
+            info["sentence_id"] = match.group(5)  # 第5組是編號
     
     return info
 
