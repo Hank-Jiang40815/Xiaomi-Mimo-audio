@@ -80,17 +80,29 @@ def create_manifest(
     noisy_dir: str,
     clean_dir: str,
     output_path: str,
-    compute_duration: bool = False
+    compute_duration: bool = False,
+    transcription_json: Optional[str] = None
 ):
     """建立資料集 manifest"""
     
     print(f"📊 建立 {dataset_name} 資料集 Manifest...")
     print(f"   含噪音目錄: {noisy_dir}")
     print(f"   乾淨目錄: {clean_dir}")
+    if transcription_json:
+        print(f"   轉錄檔案: {transcription_json}")
     print()
     
     noisy_dir = Path(noisy_dir)
     clean_dir = Path(clean_dir) if clean_dir else None
+    
+    # 載入轉錄結果 (如果有提供)
+    transcriptions = {}
+    if transcription_json and Path(transcription_json).exists():
+        print(f"📄 載入轉錄結果...")
+        with open(transcription_json, 'r', encoding='utf-8') as f:
+            transcriptions = json.load(f)
+        print(f"✓ 載入 {len(transcriptions)} 筆轉錄記錄")
+        print()
     
     # 掃描含噪音音檔
     noisy_files = sorted([f for f in noisy_dir.glob("*.wav")])
@@ -126,6 +138,13 @@ def create_manifest(
         else:
             unmatched_count += 1
         
+        # 獲取轉錄文字（優先使用 clean 檔名，否則使用 noisy 檔名）
+        transcription_text = ""
+        if clean_file and clean_file.name in transcriptions:
+            transcription_text = transcriptions[clean_file.name]["text"]
+        elif noisy_file.name in transcriptions:
+            transcription_text = transcriptions[noisy_file.name]["text"]
+        
         sample = {
             "id": sentence_id,
             "sentence_id": sentence_id,
@@ -133,7 +152,7 @@ def create_manifest(
             "noise_type": info["noise_type"],
             "noisy_file": str(noisy_file),
             "clean_file": str(clean_file) if clean_file else None,
-            "text": "",  # 預留給句子內容
+            "text": transcription_text,
             "duration": None,
             "noise_level": None  # 預留 (x60/x65/x70)
         }
@@ -205,6 +224,8 @@ def main():
                         help="輸出 manifest JSON 檔案路徑")
     parser.add_argument("--compute-duration", action="store_true",
                         help="計算音檔長度 (會花費較多時間)")
+    parser.add_argument("--transcription-json",
+                        help="轉錄結果 JSON 檔案 (包含 filename -> text 對應)")
     
     args = parser.parse_args()
     
@@ -213,7 +234,8 @@ def main():
         noisy_dir=args.noisy_dir,
         clean_dir=args.clean_dir,
         output_path=args.output,
-        compute_duration=args.compute_duration
+        compute_duration=args.compute_duration,
+        transcription_json=args.transcription_json
     )
 
 

@@ -1,0 +1,39 @@
+# Whisper ASR Docker Environment
+# 用於音訊轉錄任務，完全隔離的環境
+
+FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
+
+LABEL maintainer="MiMo-Audio Project"
+LABEL description="Whisper ASR for audio transcription"
+
+# 設定工作目錄
+WORKDIR /workspace
+
+# 避免互動式提示
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Taipei
+
+# 安裝系統依賴
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安裝 Python 依賴
+RUN pip install --no-cache-dir \
+    openai-whisper \
+    tqdm
+
+# 設定環境變數
+ENV PYTHONUNBUFFERED=1
+ENV CUDA_VISIBLE_DEVICES=0
+
+# 預下載 Whisper 模型（可選，加快首次使用速度）
+# RUN python -c "import whisper; whisper.load_model('base')"
+
+# 健康檢查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import whisper; print('OK')" || exit 1
+
+# 預設命令
+CMD ["bash"]
