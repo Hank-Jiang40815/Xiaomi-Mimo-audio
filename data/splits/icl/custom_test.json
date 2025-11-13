@@ -1,0 +1,197 @@
+{
+  "dataset": "ldv",
+  "mode": "icl",
+  "total_samples": 17,
+  "method": "custom",
+  "range": "1-10,20-25,50",
+  "seed": null,
+  "samples": [
+    {
+      "id": "001",
+      "sentence_id": "001",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_001.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_001.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "002",
+      "sentence_id": "002",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_002.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_002.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "003",
+      "sentence_id": "003",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_003.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_003.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "004",
+      "sentence_id": "004",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_004.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_004.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "005",
+      "sentence_id": "005",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_005.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_005.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "006",
+      "sentence_id": "006",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_006.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_006.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "007",
+      "sentence_id": "007",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_007.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_007.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "008",
+      "sentence_id": "008",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_008.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_008.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "009",
+      "sentence_id": "009",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_009.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_009.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "010",
+      "sentence_id": "010",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_010.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_010.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "020",
+      "sentence_id": "020",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_020.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_020.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "021",
+      "sentence_id": "021",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_021.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_021.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "022",
+      "sentence_id": "022",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_022.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_022.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "023",
+      "sentence_id": "023",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_023.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_023.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "024",
+      "sentence_id": "024",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_024.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_024.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "025",
+      "sentence_id": "025",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_025.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_025.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "050",
+      "sentence_id": "050",
+      "speaker": "boy1",
+      "noise_type": "papercup",
+      "noisy_file": "examples/ldv/mix/boy1_papercup_LDV_050.wav",
+      "clean_file": "examples/ldv/spk/boy1_papercup_clean_050.wav",
+      "text": "",
+      "duration": null,
+      "noise_level": null
+    }
+  ]
+}
