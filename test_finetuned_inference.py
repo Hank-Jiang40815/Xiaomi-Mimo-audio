@@ -44,18 +44,17 @@ def load_finetuned_model(checkpoint_path, tokenizer_path, device='cuda'):
     
     lora_config = {
         'rank': 32,
-        'alpha': 64,
-        'target_modules': ['attn.qkv', 'attn.proj', 'mlp.fc1', 'mlp.fc2']
+        'alpha': 64
     }
     
     inject_lora_to_encoder(
         tokenizer.encoder,
         rank=lora_config['rank'],
-        alpha=lora_config['alpha'],
-        target_modules=lora_config['target_modules']
+        alpha=lora_config['alpha']
     )
     
     # 載入 checkpoint 的 LoRA 權重
+    print(f"   載入 {len(checkpoint)} 個 LoRA 參數...")
     tokenizer.encoder.load_state_dict(checkpoint, strict=False)
     
     print("\n✅ 模型載入完成！")
@@ -97,29 +96,54 @@ def enhance_audio(model, input_audio_path, output_audio_path, device='cuda'):
     
     print(f"   採樣率: {sr} Hz")
     print(f"   長度: {waveform.shape[1] / sr:.2f} 秒")
-    print(f"   Shape: {waveform.shape}")
+    print(f"   Waveform Shape: {waveform.shape}")
     
-    # 2. 編碼（使用微調後的 encoder）
-    print("\n2️⃣ 使用微調後的 Encoder 編碼...")
+    # 2. 轉換為 Mel Spectrogram（和訓練時一樣）
+    print("\n2️⃣ 轉換為 Mel Spectrogram...")
+    mel_transform = torchaudio.transforms.MelSpectrogram(
+        sample_rate=24000,
+        n_fft=1024,
+        hop_length=240,
+        n_mels=128
+    ).to(device)
+    
     waveform = waveform.to(device).to(torch.bfloat16)
+    mel_spec = mel_transform(waveform)  # [1, 128, T]
+    
+    print(f"   Mel Spectrogram Shape: {mel_spec.shape}")
+    
+    # 3. 編碼（使用微調後的 encoder）
+    print("\n3️⃣ 使用微調後的 Encoder 編碼...")
     
     with torch.no_grad():
         # 編碼到 latent space
-        input_lens = torch.tensor([waveform.shape[1]], device=device)
-        encoded = model.encode(waveform.unsqueeze(0), input_lens=input_lens)
+        input_lens = torch.tensor([mel_spec.shape[2]], device=device)
+        encoded = model.encode(mel_spec, input_lens=input_lens)
         
-        # 解碼回音訊
-        print("\n3️⃣ 解碼回音訊...")
-        decoded = model.decode(encoded, input_lens=input_lens)
+        print(f"   Encoded Shape: {encoded.shape}")
+        
+        # 解碼回 Mel Spectrogram
+        print("\n4️⃣ 解碼回 Mel Spectrogram...")
+        decoded_mel = model.decode(encoded, input_lens=input_lens)
+        
+        print(f"   Decoded Mel Shape: {decoded_mel.shape}")
+        
+        # 使用 Griffin-Lim 或 Vocoder 轉回波形
+        # 這裡簡單使用 inverse mel scale
+        print("\n5️⃣ 轉回波形...")
+        # 注意: 這是簡化版本，實際應該使用訓練好的 vocoder
+        decoded = decoded_mel  # 暫時返回 mel (後續可加入 vocoder)
     
-    # 3. 儲存結果
-    print("\n4️⃣ 儲存增強音訊...")
+    # 6. 儲存結果
+    print("\n6️⃣ 儲存結果...")
     output_path = Path(output_audio_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
-    # 轉回 fp32 並儲存
-    decoded = decoded.squeeze(0).cpu().float()
-    torchaudio.save(output_path, decoded, sr)
+    # 注意: decoded 現在是 mel spectrogram，需要轉回波形
+    # 這裡暫時保存為 .pt 格式（mel spectrogram）
+    print("   ⚠️  當前版本保存 Mel Spectrogram（需要 vocoder 才能轉回音訊）")
+    output_pt = output_path.with_suffix('.pt')
+    torch.save(decoded.cpu(), output_pt)
     
     file_size = output_path.stat().st_size / 1024  # KB
     
