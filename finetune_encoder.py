@@ -200,20 +200,21 @@ def compute_feature_matching_loss(encoder: nn.Module, noisy_mel: torch.Tensor, c
     Note:
         這裡使用 audio_lens（原始音訊樣本數）而非 mel_lens（mel time dimension）
         因為 encoder.get_output_length() 期待的是音訊樣本數
-        get_features() 需要 [batch, time, n_mels] 格式，所以要 transpose
+        get_features() 期待 [batch, n_mels, time] 格式（Conv1d 標準格式）
+        不需要 transpose，因為我們不經過 unpack_hidden_states()
     """
     
     with torch.cuda.amp.autocast(enabled=True, dtype=torch.bfloat16):
-        # 編碼噪音音訊（允許梯度）- 轉換為 bfloat16 並 transpose 成 [batch, time, n_mels]
+        # 編碼噪音音訊（允許梯度）- 轉換為 bfloat16，保持 [batch, n_mels, time] 格式
         noisy_features = encoder.get_features(
-            input_features=noisy_mel.to(torch.bfloat16).transpose(1, 2),  # [batch, time, n_mels]
+            input_features=noisy_mel.to(torch.bfloat16),  # [batch, n_mels, time]
             output_length=encoder.get_output_length(audio_lens)
         )[0]  # 只取 hidden_states
         
         # 編碼乾淨音訊（作為目標，不需要梯度）
         with torch.no_grad():
             clean_features = encoder.get_features(
-                input_features=clean_mel.to(torch.bfloat16).transpose(1, 2),  # [batch, time, n_mels]
+                input_features=clean_mel.to(torch.bfloat16),  # [batch, n_mels, time]
                 output_length=encoder.get_output_length(audio_lens)
             )[0]
         
