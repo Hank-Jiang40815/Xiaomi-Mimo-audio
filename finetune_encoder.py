@@ -54,14 +54,8 @@ class OpticalDataset(Dataset):
     def __len__(self):
         return len(self.samples)
     
-    def load_and_preprocess_audio(self, path: str) -> tuple[torch.Tensor, int]:
-        """載入音訊並轉換為 mel spectrogram，同時返回原始音訊長度
-        
-        Returns:
-            tuple: (mel_spec, audio_len)
-                - mel_spec: [n_mels, time] 的 mel spectrogram
-                - audio_len: 原始音訊的樣本數（padding 後）
-        """
+    def load_and_preprocess_audio(self, path: str) -> torch.Tensor:
+        """載入音訊並轉換為 mel spectrogram"""
         waveform, sr = torchaudio.load(path)
         
         # 重新採樣到 24kHz
@@ -80,25 +74,21 @@ class OpticalDataset(Dataset):
             pad_length = self.max_length - waveform.shape[1]
             waveform = F.pad(waveform, (0, pad_length), value=0.0)
         
-        audio_len = waveform.shape[1]  # 記錄音訊樣本數
-        
         # 轉換為 mel spectrogram: [1, n_mels, time]
         mel_spec = self.mel_transform(waveform)
         
-        return mel_spec.squeeze(0), audio_len  # [n_mels, time], audio_len
+        return mel_spec.squeeze(0)  # [n_mels, time]
     
     def __getitem__(self, idx):
         sample = self.samples[idx]
         
         try:
-            noisy_mel, noisy_audio_len = self.load_and_preprocess_audio(sample['noisy_file'])
-            clean_mel, clean_audio_len = self.load_and_preprocess_audio(sample['clean_file'])
+            noisy_audio = self.load_and_preprocess_audio(sample['noisy_file'])
+            clean_audio = self.load_and_preprocess_audio(sample['clean_file'])
             
             return {
-                'noisy_audio': noisy_mel,
-                'clean_audio': clean_mel,
-                'noisy_audio_len': noisy_audio_len,
-                'clean_audio_len': clean_audio_len,
+                'noisy_audio': noisy_audio,
+                'clean_audio': clean_audio,
                 'sample_id': sample.get('id', str(idx)),
                 'transcription': sample.get('transcription', '')
             }
@@ -109,8 +99,6 @@ class OpticalDataset(Dataset):
             return {
                 'noisy_audio': torch.zeros(128, mel_time),
                 'clean_audio': torch.zeros(128, mel_time),
-                'noisy_audio_len': self.max_length,
-                'clean_audio_len': self.max_length,
                 'sample_id': f'error_{idx}',
                 'transcription': ''
             }
@@ -184,8 +172,7 @@ def inject_lora_to_encoder(encoder: nn.Module, rank: int = 8, alpha: float = 16.
     return lora_modules
 
 
-def compute_feature_matching_loss(encoder: nn.Module, noisy_mel: torch.Tensor, clean_mel: torch.Tensor, 
-                                 audio_lens: torch.Tensor, device) -> torch.Tensor:
+def compute_feature_matching_loss(encoder: nn.Module, noisy_mel: torch.Tensor, clean_mel: torch.Tensor, device) -> torch.Tensor:
     """
     計算特徵匹配損失（簡化版本）
     目標：讓 encoder 從噪音音訊中提取的特徵接近乾淨音訊的特徵
@@ -194,28 +181,25 @@ def compute_feature_matching_loss(encoder: nn.Module, noisy_mel: torch.Tensor, c
         encoder: Audio Encoder
         noisy_mel: [batch, n_mels, time] 噪音 mel spectrogram
         clean_mel: [batch, n_mels, time] 乾淨 mel spectrogram
-        audio_lens: [batch] 原始音訊的樣本數（用於計算正確的 output_length）
-        device: torch device
-    
-    Note:
-        這裡使用 audio_lens（原始音訊樣本數）而非 mel_lens（mel time dimension）
-        因為 encoder.get_output_length() 期待的是音訊樣本數
-        get_features() 期待 [batch, n_mels, time] 格式（Conv1d 標準格式）
-        不需要 transpose，因為我們不經過 unpack_hidden_states()
     """
+    batch_size = noisy_mel.shape[0]
+    mel_len = noisy_mel.shape[2]
+    
+    # 計算 mel 長度
+    mel_lens = torch.tensor([mel_len] * batch_size, device=device, dtype=torch.long)
     
     with torch.cuda.amp.autocast(enabled=True, dtype=torch.bfloat16):
-        # 編碼噪音音訊（允許梯度）- 轉換為 bfloat16，保持 [batch, n_mels, time] 格式
+        # 編碼噪音音訊（允許梯度）- 轉換為 bfloat16
         noisy_features = encoder.get_features(
             input_features=noisy_mel.to(torch.bfloat16),  # [batch, n_mels, time]
-            output_length=encoder.get_output_length(audio_lens)
+            output_length=encoder.get_output_length(mel_lens)
         )[0]  # 只取 hidden_states
         
         # 編碼乾淨音訊（作為目標，不需要梯度）
         with torch.no_grad():
             clean_features = encoder.get_features(
-                input_features=clean_mel.to(torch.bfloat16),  # [batch, n_mels, time]
-                output_length=encoder.get_output_length(audio_lens)
+                input_features=clean_mel.to(torch.bfloat16),
+                output_length=encoder.get_output_length(mel_lens)
             )[0]
         
         # 計算特徵空間的 MSE 損失
@@ -236,9 +220,8 @@ def train_one_epoch(model, dataloader, optimizer, device, epoch, gradient_accumu
     for batch_idx, batch in enumerate(progress_bar):
         noisy_audio = batch['noisy_audio'].to(device)
         clean_audio = batch['clean_audio'].to(device)
-        audio_lens = batch['noisy_audio_len'].to(device)  # 使用原始音訊長度
         
-        loss = compute_feature_matching_loss(model.encoder, noisy_audio, clean_audio, audio_lens, device)
+        loss = compute_feature_matching_loss(model.encoder, noisy_audio, clean_audio, device)
         
         loss = loss / gradient_accumulation_steps
         loss.backward()
@@ -270,9 +253,8 @@ def validate(model, dataloader, device):
     for batch in tqdm(dataloader, desc="Validation"):
         noisy_audio = batch['noisy_audio'].to(device)
         clean_audio = batch['clean_audio'].to(device)
-        audio_lens = batch['noisy_audio_len'].to(device)  # 使用原始音訊長度
         
-        loss = compute_feature_matching_loss(model.encoder, noisy_audio, clean_audio, audio_lens, device)
+        loss = compute_feature_matching_loss(model.encoder, noisy_audio, clean_audio, device)
         
         total_loss += loss.item()
         num_batches += 1

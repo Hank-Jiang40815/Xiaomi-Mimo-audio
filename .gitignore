@@ -37,19 +37,18 @@ ENV/
 # Model files (download separately)
 models/
 
-# Examples - 音訊檔案不追蹤（太大且可重新生成）
-examples/optical/*/*.wav
-examples/optical_normalized/*/*.wav
-examples/optical_denoised/*/*.wav
-examples/optical_denoised_sample/*/*.wav
-examples/optical_normalized_sample/*/*.wav
-examples/ldv/*/*.wav
-examples/ESD/*.wav
-examples/*.wav
-examples/*.mp3
-examples/audio_enhancement_*.wav
-examples/楊老師光路.zip
+# Experimental audio datasets (directories)
+examples/optical/
+examples/optical_normalized/
+examples/optical_denoised/
+examples/optical_denoised_sample/
+examples/optical_normalized_sample/
+examples/ldv/
 
-# 臨時檔案
-temp_inference_*.py
-test.wav
+# Experimental audio datasets (files)
+examples/楊老師光路.zip
+examples/audio_enhancement_result*.wav
+
+# Test audio files
+100m-car-on-boy1*.wav
+100m-car-on-glass*.wav

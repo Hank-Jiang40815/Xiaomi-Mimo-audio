@@ -79,7 +79,8 @@ def test_finetuned_encoder(checkpoint_path, tokenizer_path, test_audio, device='
     print("\n6️⃣ 測試微調後的 Encoder...")
     
     with torch.no_grad():
-        input_lens = torch.tensor([mel_spec.shape[2]], device=device)
+        # 使用原始音訊的樣本數，而非 mel time dimension
+        input_lens = torch.tensor([waveform.shape[1]], device=device)
         
         # 使用微調後的 encoder
         encoded = tokenizer.encode(mel_spec, input_lens=input_lens, use_quantizer=False)

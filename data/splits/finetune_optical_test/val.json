@@ -1,0 +1,62 @@
+{
+  "dataset": "optical",
+  "split": "val_test",
+  "num_samples": 5,
+  "samples": [
+    {
+      "id": "224",
+      "sentence_id": "224",
+      "speaker": "boy5",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/boy5_WOLDV_224.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_224.wav",
+      "text": "我早上在火车站遇到他",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "249",
+      "sentence_id": "249",
+      "speaker": "boy4",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/boy4_WOLDV_249.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_249.wav",
+      "text": "今年國慶日放了幾天假",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "097",
+      "sentence_id": "097",
+      "speaker": "boy4",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/boy4_WOLDV_097.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_097.wav",
+      "text": "他們全家非常喜歡登山",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "019",
+      "sentence_id": "019",
+      "speaker": "boy5",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/boy5_WOLDV_019.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_019.wav",
+      "text": "他今年7月要參加考試",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "030",
+      "sentence_id": "030",
+      "speaker": "boy2",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/boy2_WOLDV_030.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_030.wav",
+      "text": "它為你的考試成績擔心",
+      "duration": null,
+      "noise_level": null
+    }
+  ]
+}

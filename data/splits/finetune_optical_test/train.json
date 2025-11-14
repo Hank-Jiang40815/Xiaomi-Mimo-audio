@@ -1,0 +1,117 @@
+{
+  "dataset": "optical",
+  "split": "train_test",
+  "num_samples": 10,
+  "samples": [
+    {
+      "id": "032",
+      "sentence_id": "032",
+      "speaker": "boy1",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/boy1_WOLDV_032.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_032.wav",
+      "text": "盛蛋疊前,信箱三滿赫卡",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "075",
+      "sentence_id": "075",
+      "speaker": "girl4",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/girl4_WOLDV_075.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_075.wav",
+      "text": "我很相信他的決策能力",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "001",
+      "sentence_id": "001",
+      "speaker": "boy1",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/boy1_WOLDV_001.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_001.wav",
+      "text": "正學齊學校友書法比賽",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "050",
+      "sentence_id": "050",
+      "speaker": "girl3",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/girl3_WOLDV_050.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_050.wav",
+      "text": "這次英文考試我很緊張",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "194",
+      "sentence_id": "194",
+      "speaker": "girl4",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/girl4_WOLDV_194.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_194.wav",
+      "text": "爸爸今天買了一個西瓜",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "249",
+      "sentence_id": "249",
+      "speaker": "boy3",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/boy3_WOLDV_249.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_249.wav",
+      "text": "今年國慶日放了幾天假",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "173",
+      "sentence_id": "173",
+      "speaker": "boy4",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/boy4_WOLDV_173.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_173.wav",
+      "text": "阿姨送給我一包水果糖",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "093",
+      "sentence_id": "093",
+      "speaker": "boy6",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/boy6_WOLDV_093.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_093.wav",
+      "text": "我們都在學習電腦打字",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "222",
+      "sentence_id": "222",
+      "speaker": "boy3",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/boy3_WOLDV_222.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_222.wav",
+      "text": "這隻貓把床單給抓破了",
+      "duration": null,
+      "noise_level": null
+    },
+    {
+      "id": "173",
+      "sentence_id": "173",
+      "speaker": "girl7",
+      "noise_type": "WOLDV",
+      "noisy_file": "examples/optical/mix/girl7_WOLDV_173.wav",
+      "clean_file": "examples/optical/spk1/girl7_WOLDV_clean_173.wav",
+      "text": "阿姨送給我一包水果糖",
+      "duration": null,
+      "noise_level": null
+    }
+  ]
+}
