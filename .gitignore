@@ -52,3 +52,6 @@ examples/audio_enhancement_result*.wav
 # Test audio files
 100m-car-on-boy1*.wav
 100m-car-on-glass*.wav
+
+# 測試和訓練日誌
+*.log
