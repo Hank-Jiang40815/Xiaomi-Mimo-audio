@@ -79,11 +79,16 @@ def test_finetuned_encoder(checkpoint_path, tokenizer_path, test_audio, device='
     print("\n6️⃣ 測試微調後的 Encoder...")
     
     with torch.no_grad():
-        # 使用原始音訊的樣本數，而非 mel time dimension
-        input_lens = torch.tensor([waveform.shape[1]], device=device)
+        # 重要：訓練時我們直接調用 encoder.get_features()，所以 inference 時也應該這樣做
+        # 不要使用 tokenizer.encode()，因為它會調用 unpack_hidden_states()
         
-        # 使用微調後的 encoder
-        encoded = tokenizer.encode(mel_spec, input_lens=input_lens, use_quantizer=False)
+        mel_lens = torch.tensor([mel_spec.shape[2]], device=device)
+        
+        # 直接使用 encoder.get_features()（與訓練時一致）
+        encoded = tokenizer.encoder.get_features(
+            input_features=mel_spec,  # [batch, n_mels, time]
+            output_length=tokenizer.encoder.get_output_length(mel_lens)
+        )[0]  # 只取 hidden_states
         
         print(f"   Encoded Shape: {encoded.shape}")
         print(f"   Encoded dtype: {encoded.dtype}")
