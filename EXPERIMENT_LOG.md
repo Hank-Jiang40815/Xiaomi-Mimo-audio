@@ -1,7 +1,24 @@
-# MiMo-Audio Docker 實驗記錄
+# MiMo-Audio 實驗記錄
 
-## 實驗日期
-2025-10-13
+## 最新實驗 (2025-11-13)
+### 🧪 Encoder Fine-tuning - LoRA Rank 32, 100 Epochs
+**狀態**: ✅ 已完成  
+**詳細報告**: [FINETUNE_EXPERIMENT_R32_E100.md](FINETUNE_EXPERIMENT_R32_E100.md)
+
+**核心發現**:
+- ✅ Training 成功完成 100 epochs (33.51% loss 改善)
+- ✅ 無過擬合 (Train-Val gap 僅 0.28%)
+- ⚠️ 最佳 Val loss 在 Epoch 2 出現，100 epochs 過多
+- ⚠️ 發現資料集洩漏問題 (196/136/208 樣本重疊)
+
+**後續行動**:
+1. 修復資料洩漏，重新生成 splits
+2. 用乾淨資料集重訓，加入 early stopping
+3. 客觀評估音訊品質 (SI-SDR, PESQ)
+
+---
+
+## Docker 實驗 (2025-10-13)
 
 ## 實驗目的
 驗證 MiMo-Audio 模型在 Docker 容器中的完整功能，包括：
