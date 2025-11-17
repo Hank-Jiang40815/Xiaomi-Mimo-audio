@@ -1,4 +1,33 @@
-# 🧪 Encoder Fine-tuning 實驗報告 - LoRA Rank 32, 100 Epochs
+# 🧪 Encoder Fine-tuning 實驗報告 - LoRA Rank 32
+
+## 2025-11-17｜V2：Codebook Alignment + Inference Sanity Check
+
+| 項目 | 設定 |
+|------|------|
+| **訓練腳本** | `bash start_training_v2.sh`（docker + tmux `finetune_v2`） |
+| **Loss** | Feature MSE + Codebook Alignment L1 + VQ Commit (`lambda_feat=1, lambda_code=1, lambda_vq=0.1`) |
+| **輸出** | `outputs/optical_lora_v2_r32_e100/` (`best_model.pt`, checkpoint 每 10 epochs, `training_history.json`) |
+| **推論** | `CHECKPOINT=outputs/optical_lora_v2_r32_e100/best_model.pt INPUT=examples/optical/mix/boy1_WOLDV_050.wav OUTPUT=outputs/test_inference_v2/enhanced_050.wav ./test_inference_docker.sh --no-tmux` |
+
+### 📊 訓練指標
+| 指標 | Epoch 1 | Epoch 100 | Best |
+|------|---------|-----------|------|
+| **Train Loss** | 12.08 | 8.22 | 8.22 (E100) |
+| **Val Loss** | 9.23 | 8.20 | **8.06 (E2)** |
+
+- 100 epochs 全程穩定，最佳驗證仍出現在前期（E2），顯示可加入 early stopping。  
+- Codebook Alignment Loss 未發散，train/val 曲線平行（詳見 `training_history.json`）。  
+- `best_model.pt` 已用於單檔 inference，輸出 `outputs/test_inference_v2/enhanced_050.wav`（長度 2.6 秒）。
+
+### 📝 補充紀錄
+1. **Quantizer dtype 修正**：`finetune_encoder_v2.py` 內改為從 quantizer buffer 取得 dtype，避免沒有梯度參數時 crash。  
+2. **執行流程**：`start_training_v2.sh` 會檢查資料/模型、建立 tmux、在 docker 中啟動 `python finetune_encoder_v2.py`。log 透過 `tee outputs/optical_lora_v2_r32_e100/training.log` 留存。  
+3. **Inference output**：`enhanced_050.wav` 可與 `examples/optical/mix/boy1_WOLDV_050.wav` 對照；後續需批次化評估 (SI-SDR / PESQ)。  
+4. **TODO**：重建無洩漏 splits、加入 early stopping、撰寫客觀測試腳本、整理主觀聽感。
+
+---
+
+## 2025-11-13｜V1：LoRA Rank 32, 100 Epochs（舊實驗）
 
 **實驗日期**: 2025-11-13  
 **實驗目的**: 使用 LoRA 微調 MiMo-Audio-Tokenizer 編碼器，提升 Optical 麥克風音訊降噪能力  
