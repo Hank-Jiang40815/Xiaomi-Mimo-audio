@@ -88,15 +88,23 @@ def inject_lora_to_encoder(encoder, rank=32, alpha=64):
     return encoder
 
 
-def compute_codebook_aware_loss(encoder, noisy_audio, clean_audio, device, lambda_feat=1.0, lambda_code=2.0):
+def compute_codebook_aware_loss(
+    encoder,
+    noisy_audio,
+    clean_audio,
+    device,
+    lambda_feat=1.0,
+    lambda_code=1.0,
+    lambda_vq=0.1,
+):
     """
     改進的損失函數：Codebook-Aware Loss
     
     核心思想：
     1. Feature matching loss: 特徵空間對齊
-    2. Codebook alignment loss: 確保映射到相同的 codebook codes
-    3. Code consistency loss: 確保 codes 的分布一致
-    
+    2. Codebook alignment loss: 確保映射到相同的 codebook codes（使用 quantizer forward，可回傳梯度）
+    3. Code consistency loss: 透過 quantizer 的 commit loss 維持碼本穩定
+
     Args:
         encoder: Audio Encoder (with LoRA)
         noisy_audio: [batch, n_mels, time] mel spectrogram
@@ -126,43 +134,38 @@ def compute_codebook_aware_loss(encoder, noisy_audio, clean_audio, device, lambd
         feature_loss = F.mse_loss(noisy_features, clean_features)
         
         # === 2. Codebook Alignment Loss ===
-        # 注意：AudioEncoder.encode() 期望 packed 格式 [total_len, n_mels]
-        noisy_transposed = noisy_audio.transpose(1, 2).contiguous()  # [batch, time, n_mels]
-        clean_transposed = clean_audio.transpose(1, 2).contiguous()
-        noisy_packed = noisy_transposed.view(batch_size * mel_len, noisy_transposed.shape[-1])
-        clean_packed = clean_transposed.view(batch_size * mel_len, clean_transposed.shape[-1])
+        # 使用 quantizer forward 取得可微分的 codebook 表示
+        quantizer = getattr(encoder, "quantizer", None)
+        if quantizer is None:
+            raise ValueError("Encoder does not expose a quantizer; cannot run codebook-aware loss.")
+        
+        # quantizer 可能沒有參數（純 buffer 代碼本），因此需安全取得 dtype
+        try:
+            quantizer_dtype = next(quantizer.parameters()).dtype
+        except StopIteration:
+            quantizer_buffer = next(quantizer.buffers(), None)
+            quantizer_dtype = quantizer_buffer.dtype if quantizer_buffer is not None else noisy_features.dtype
+        noisy_flat = noisy_features.reshape(-1, noisy_features.shape[-1]).to(quantizer_dtype)
+        quantized_noisy, _, vq_commit_loss, _ = quantizer(noisy_flat)
+        quantized_noisy = quantized_noisy.view_as(noisy_features)
         
         with torch.no_grad():
-            # 獲取 clean audio 的 codebook codes（目標）
-            clean_codes, _ = encoder.encode(
-                input_features=clean_packed.to(device=device, dtype=torch.bfloat16),
-                input_lens=mel_lens,
-                return_codes_only=True,
-                use_quantizer=True
-            )
+            clean_flat = clean_features.reshape(-1, clean_features.shape[-1]).to(quantizer_dtype)
+            quantized_clean, _, _, _ = quantizer(clean_flat)
+            quantized_clean = quantized_clean.view_as(clean_features)
         
-        # 獲取 noisy audio 的 codebook codes（預測）
-        noisy_codes, _ = encoder.encode(
-            input_features=noisy_packed.to(device=device, dtype=torch.bfloat16),
-            input_lens=mel_lens,
-            return_codes_only=True,
-            use_quantizer=True
-        )
-        
-        # Code matching loss: L1 distance between code indices
-        # codes shape: [n_q, batch * time_compressed]
-        # 使用 L1 loss 而非 cross_entropy，因為 codes 是 indices
-        code_loss = F.l1_loss(
-            noisy_codes.float(),
-            clean_codes.float()
-        )
+        code_loss = F.l1_loss(quantized_noisy, quantized_clean)
         
         # === 3. Perceptual Loss (optional) ===
         # 使用不同層的特徵（如果有 skip connection）
         # 這裡暫時省略，可以後續加入
         
         # 總損失
-        total_loss = lambda_feat * feature_loss + lambda_code * code_loss
+        total_loss = (
+            lambda_feat * feature_loss
+            + lambda_code * code_loss
+            + lambda_vq * vq_commit_loss
+        )
     
     return total_loss, feature_loss, code_loss
 
@@ -259,7 +262,16 @@ class OpticalDataset(Dataset):
         }
 
 
-def train_one_epoch(encoder, dataloader, optimizer, device, epoch, gradient_accumulation_steps=1):
+def train_one_epoch(
+    encoder,
+    dataloader,
+    optimizer,
+    device,
+    epoch,
+    gradient_accumulation_steps=1,
+    lambda_code=1.0,
+    lambda_vq=0.1,
+):
     encoder.train()
     total_loss = 0.0
     total_feat_loss = 0.0
@@ -275,8 +287,13 @@ def train_one_epoch(encoder, dataloader, optimizer, device, epoch, gradient_accu
         
         # 計算損失
         loss, feat_loss, code_loss = compute_codebook_aware_loss(
-            encoder, noisy_audio, clean_audio, device,
-            lambda_feat=1.0, lambda_code=2.0
+            encoder,
+            noisy_audio,
+            clean_audio,
+            device,
+            lambda_feat=1.0,
+            lambda_code=lambda_code,
+            lambda_vq=lambda_vq,
         )
         
         # Gradient accumulation
@@ -308,7 +325,7 @@ def train_one_epoch(encoder, dataloader, optimizer, device, epoch, gradient_accu
 
 
 @torch.no_grad()
-def validate(encoder, dataloader, device):
+def validate(encoder, dataloader, device, lambda_code=1.0, lambda_vq=0.1):
     encoder.eval()
     total_loss = 0.0
     total_feat_loss = 0.0
@@ -320,7 +337,13 @@ def validate(encoder, dataloader, device):
         clean_audio = batch['clean_audio'].to(device)
         
         loss, feat_loss, code_loss = compute_codebook_aware_loss(
-            encoder, noisy_audio, clean_audio, device
+            encoder,
+            noisy_audio,
+            clean_audio,
+            device,
+            lambda_feat=1.0,
+            lambda_code=lambda_code,
+            lambda_vq=lambda_vq,
         )
         
         total_loss += loss.item()
@@ -343,6 +366,8 @@ def main():
     parser.add_argument('--lr', type=float, default=5e-5)
     parser.add_argument('--gradient-accumulation', type=int, default=8)
     parser.add_argument('--save-every', type=int, default=10)
+    parser.add_argument('--lambda-code', type=float, default=1.0, help='Weight for codebook alignment loss')
+    parser.add_argument('--lambda-vq', type=float, default=0.1, help='Weight for quantizer commit loss')
     
     args = parser.parse_args()
     
@@ -400,11 +425,23 @@ def main():
         logger.info(f"\nEpoch {epoch}/{args.epochs}")
         
         train_loss, train_feat, train_code = train_one_epoch(
-            tokenizer.encoder, train_loader, optimizer, device, epoch,
-            gradient_accumulation_steps=args.gradient_accumulation
+            tokenizer.encoder,
+            train_loader,
+            optimizer,
+            device,
+            epoch,
+            gradient_accumulation_steps=args.gradient_accumulation,
+            lambda_code=args.lambda_code,
+            lambda_vq=args.lambda_vq,
         )
         
-        val_loss, val_feat, val_code = validate(tokenizer.encoder, val_loader, device)
+        val_loss, val_feat, val_code = validate(
+            tokenizer.encoder,
+            val_loader,
+            device,
+            lambda_code=args.lambda_code,
+            lambda_vq=args.lambda_vq,
+        )
         
         logger.info(f"📊 Train Loss: {train_loss:.4f} (feat={train_feat:.4f}, code={train_code:.4f})")
         logger.info(f"📊 Val Loss:   {val_loss:.4f} (feat={val_feat:.4f}, code={val_code:.4f})")

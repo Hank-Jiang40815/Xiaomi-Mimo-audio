@@ -1,6 +1,27 @@
 # MiMo-Audio 實驗記錄
 
-## 最新實驗 (2025-11-13)
+## 最新實驗 (2025-11-17)
+### 🧪 Encoder Fine-tuning V2 - Codebook Alignment (LoRA Rank 32)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 訓練：`bash start_training_v2.sh` → docker + tmux，輸出於 `outputs/optical_lora_v2_r32_e100/`
+- 推論：`CHECKPOINT=outputs/optical_lora_v2_r32_e100/best_model.pt INPUT=examples/optical/mix/boy1_WOLDV_050.wav OUTPUT=outputs/test_inference_v2/enhanced_050.wav ./test_inference_docker.sh --no-tmux`
+
+**關鍵結果**:
+- Loss 組成：Feature MSE + Codebook L1 + VQ commit（`lambda_feat=1, lambda_code=1, lambda_vq=0.1`）
+- Train Loss: 12.08 → 8.22；Val Loss: 9.23 → 8.20（最佳 8.06 @ epoch 2）
+- Checkpoints：`best_model.pt` + 每 10 epoch 快照；訓練曲線 `training_history.json`
+- 推論樣本：`outputs/test_inference_v2/enhanced_050.wav`（與 `examples/optical/mix/boy1_WOLDV_050.wav` 對照）
+
+**洞察 / 待辦**:
+1. Codebook-aware Loss 可穩定訓練，但仍需檢查資料洩漏對 Val 的影響
+2. 建議以 `test_inference_docker.sh` 批次生成樣本並計算 SI-SDR/PESQ
+3. 若要縮短訓練，可加入 early stopping（最佳點依舊落在前幾個 epoch）
+
+---
+
+## 過往實驗 (2025-11-13)
 ### 🧪 Encoder Fine-tuning - LoRA Rank 32, 100 Epochs
 **狀態**: ✅ 已完成  
 **詳細報告**: [FINETUNE_EXPERIMENT_R32_E100.md](FINETUNE_EXPERIMENT_R32_E100.md)
