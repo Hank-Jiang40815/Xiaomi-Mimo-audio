@@ -1,6 +1,27 @@
 # MiMo-Audio 實驗記錄
 
-## 最新實驗 (2025-11-17)
+## 最新實驗 (2025-11-18)
+### 🧪 Encoder Fine-tuning V2 - Codebook Alignment + Mel Normalization
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 訓練：`bash start_training_v2.sh`（已啟用 `--normalize-mel`）→ docker + tmux `finetune_v2`，輸出 `outputs/optical_lora_v2_norm_r32_e100/`
+- 推論：`CHECKPOINT=outputs/optical_lora_v2_norm_r32_e100/best_model.pt INPUT=examples/optical/mix/boy1_WOLDV_050.wav OUTPUT=outputs/test_inference_v2_norm/enhanced_050.wav ./test_inference_docker.sh --no-tmux`
+
+**關鍵結果**:
+- Train Loss: 6.06 → 0.063；Val Loss: 3.14 → 0.040（最佳 0.033 @ epoch 47）
+- Mel per-band z-score 正規化讓 loss 尺度下降、收斂更快；最佳點出現在中段
+- Checkpoints：`best_model.pt` + 每 10 epoch 快照；新 log `training_history.json`
+- 推論樣本：`outputs/test_inference_v2_norm/enhanced_050.wav`（另存 `examples/codebook_align_inference/boy1_WOLDV_050_enhanced_v2_norm.wav`）
+
+**洞察 / 待辦**:
+1. Normalize 版本顯示 loss 下降幅度明顯，需配合 SI-SDR/PESQ 驗證是否真的改善音質
+2. 建議使用同一 script 批次產線：`CHECKPOINT=outputs/optical_lora_v2_norm_r32_e100/best_model.pt bash test_inference_quick.sh`
+3. 下一步：修補 splits＋加入 early stopping，再重訓比較 norm vs non-norm 表現
+
+---
+
+## 過往實驗 (2025-11-17)
 ### 🧪 Encoder Fine-tuning V2 - Codebook Alignment (LoRA Rank 32)
 **狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
 

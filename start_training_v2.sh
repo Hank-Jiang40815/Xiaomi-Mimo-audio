@@ -17,7 +17,7 @@ echo ""
 # 配置
 DATA_DIR="./data/splits/finetune_optical"
 TOKENIZER="./models/MiMo-Audio-Tokenizer"
-OUTPUT_DIR="./outputs/optical_lora_v2_r32_e100"
+OUTPUT_DIR="./outputs/optical_lora_v2_norm_r32_e100"
 RANK=32
 ALPHA=64
 BATCH_SIZE=8
@@ -27,6 +27,11 @@ LR=5e-5
 LAMBDA_CODE=1.0
 LAMBDA_VQ=0.1
 TRAIN_LOG="$OUTPUT_DIR/training.log"
+NORMALIZE_MEL=true
+NORMALIZE_FLAG=""
+if [ "$NORMALIZE_MEL" = true ]; then
+    NORMALIZE_FLAG="--normalize-mel"
+fi
 
 echo "配置："
 echo "  📁 Data: $DATA_DIR"
@@ -36,6 +41,7 @@ echo "  📚 Epochs: $EPOCHS"
 echo "  📈 LR: $LR"
 echo "  💾 Output: $OUTPUT_DIR"
 echo "  ⚖️  lambda_code=$LAMBDA_CODE, lambda_vq=$LAMBDA_VQ"
+echo "  🎛️  Normalize Mel: $NORMALIZE_MEL"
 echo ""
 
 # 檢查必要檔案
@@ -87,6 +93,7 @@ tmux new-session -d -s "$SESSION_NAME" bash -c "
         --lr $LR \
         --lambda-code $LAMBDA_CODE \
         --lambda-vq $LAMBDA_VQ \
+        $NORMALIZE_FLAG \
         --save-every 10 \
         2>&1 | tee \"$TRAIN_LOG\"
     

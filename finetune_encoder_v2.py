@@ -179,12 +179,21 @@ class OpticalDataset(Dataset):
     - Mel 參數需與 MiMo-Audio-Tokenizer 的 config 一致
     """
 
-    def __init__(self, data_dir, split='train', max_length=10.0, sample_rate=24000):
+    def __init__(
+        self,
+        data_dir,
+        split='train',
+        max_length=10.0,
+        sample_rate=24000,
+        normalize=False,
+    ):
         self.data_dir = Path(data_dir)
         self.split = split
         self.max_length = max_length  # 以秒為單位
         self.sample_rate = sample_rate
         self.max_samples = int(max_length * sample_rate)
+        self.normalize = normalize
+        self.eps = 1e-6
 
         # Mel Spectrogram 轉換器（與 MiMo-Audio-Tokenizer 一致）
         self.mel_transform = torchaudio.transforms.MelSpectrogram(
@@ -236,8 +245,12 @@ class OpticalDataset(Dataset):
             waveform = F.pad(waveform, (0, pad_len), value=0.0)
 
         # 轉成 mel spectrogram: [1, n_mels, time] -> [n_mels, time]
-        mel_spec = self.mel_transform(waveform)
-        return mel_spec.squeeze(0)
+        mel_spec = self.mel_transform(waveform).squeeze(0)
+        if self.normalize:
+            mel_spec = (mel_spec - mel_spec.mean(dim=-1, keepdim=True)) / (
+                mel_spec.std(dim=-1, keepdim=True).clamp_min(self.eps)
+            )
+        return mel_spec
 
     def __getitem__(self, idx):
         item = self.data[idx]
@@ -368,6 +381,7 @@ def main():
     parser.add_argument('--save-every', type=int, default=10)
     parser.add_argument('--lambda-code', type=float, default=1.0, help='Weight for codebook alignment loss')
     parser.add_argument('--lambda-vq', type=float, default=0.1, help='Weight for quantizer commit loss')
+    parser.add_argument('--normalize-mel', action='store_true', help='Apply per-band mean/std normalization to mel spectrogram inputs')
     
     args = parser.parse_args()
     
@@ -396,8 +410,19 @@ def main():
     
     # 準備資料
     logger.info("\n3️⃣ Loading Dataset...")
-    train_dataset = OpticalDataset(args.data_dir, split='train')
-    val_dataset = OpticalDataset(args.data_dir, split='val')
+    train_dataset = OpticalDataset(
+        args.data_dir,
+        split='train',
+        normalize=args.normalize_mel,
+    )
+    val_dataset = OpticalDataset(
+        args.data_dir,
+        split='val',
+        normalize=args.normalize_mel,
+    )
+
+    if args.normalize_mel:
+        logger.info("🎛️  Enabled per-band mel normalization for datasets")
     
     train_loader = DataLoader(
         train_dataset, batch_size=args.batch_size,
