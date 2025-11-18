@@ -185,14 +185,14 @@ class OpticalDataset(Dataset):
         split='train',
         max_length=10.0,
         sample_rate=24000,
-        normalize=False,
+        normalize_waveform=False,
     ):
         self.data_dir = Path(data_dir)
         self.split = split
         self.max_length = max_length  # 以秒為單位
         self.sample_rate = sample_rate
         self.max_samples = int(max_length * sample_rate)
-        self.normalize = normalize
+        self.normalize_waveform = normalize_waveform
         self.eps = 1e-6
 
         # Mel Spectrogram 轉換器（與 MiMo-Audio-Tokenizer 一致）
@@ -244,12 +244,13 @@ class OpticalDataset(Dataset):
             pad_len = self.max_samples - num_samples
             waveform = F.pad(waveform, (0, pad_len), value=0.0)
 
+        if self.normalize_waveform:
+            mean = waveform.mean()
+            std = waveform.std().clamp_min(self.eps)
+            waveform = (waveform - mean) / std
+
         # 轉成 mel spectrogram: [1, n_mels, time] -> [n_mels, time]
         mel_spec = self.mel_transform(waveform).squeeze(0)
-        if self.normalize:
-            mel_spec = (mel_spec - mel_spec.mean(dim=-1, keepdim=True)) / (
-                mel_spec.std(dim=-1, keepdim=True).clamp_min(self.eps)
-            )
         return mel_spec
 
     def __getitem__(self, idx):
@@ -381,7 +382,7 @@ def main():
     parser.add_argument('--save-every', type=int, default=10)
     parser.add_argument('--lambda-code', type=float, default=1.0, help='Weight for codebook alignment loss')
     parser.add_argument('--lambda-vq', type=float, default=0.1, help='Weight for quantizer commit loss')
-    parser.add_argument('--normalize-mel', action='store_true', help='Apply per-band mean/std normalization to mel spectrogram inputs')
+    parser.add_argument('--normalize-waveform', action='store_true', help='Normalize waveform (mean=0, std=1) before computing Mel spectrogram')
     
     args = parser.parse_args()
     
@@ -413,16 +414,16 @@ def main():
     train_dataset = OpticalDataset(
         args.data_dir,
         split='train',
-        normalize=args.normalize_mel,
+        normalize_waveform=args.normalize_waveform,
     )
     val_dataset = OpticalDataset(
         args.data_dir,
         split='val',
-        normalize=args.normalize_mel,
+        normalize_waveform=args.normalize_waveform,
     )
 
-    if args.normalize_mel:
-        logger.info("🎛️  Enabled per-band mel normalization for datasets")
+    if args.normalize_waveform:
+        logger.info("🎛️  Enabled waveform normalization (mean 0, std 1) before Mel conversion")
     
     train_loader = DataLoader(
         train_dataset, batch_size=args.batch_size,

@@ -1,10 +1,10 @@
 # 🧪 Encoder Fine-tuning 實驗報告 - LoRA Rank 32
 
-## 2025-11-18｜V2-Norm：Codebook Alignment + Mel Normalization
+## 2025-11-18｜V2-Norm：Codebook Alignment + Waveform Normalization
 
 | 項目 | 設定 |
 |------|------|
-| **訓練腳本** | `bash start_training_v2.sh`（啟用 `--normalize-mel`，tmux `finetune_v2`） |
+| **訓練腳本** | `bash start_training_v2.sh`（啟用 `--normalize-waveform`，tmux `finetune_v2`） |
 | **Loss** | Feature MSE + Codebook Alignment L1 + VQ Commit (`lambda_feat=1, lambda_code=1, lambda_vq=0.1`) |
 | **輸出** | `outputs/optical_lora_v2_norm_r32_e100/` (`best_model.pt`, checkpoint every 10 epochs, `training_history.json`) |
 | **推論** | `CHECKPOINT=outputs/optical_lora_v2_norm_r32_e100/best_model.pt INPUT=examples/optical/mix/boy1_WOLDV_050.wav OUTPUT=outputs/test_inference_v2_norm/enhanced_050.wav ./test_inference_docker.sh --no-tmux` |
@@ -15,12 +15,12 @@
 | **Train Loss** | 6.06 | 0.06 | 0.06 (E100) |
 | **Val Loss** | 3.14 | 0.04 | **0.033 (E47)** |
 
-- 正規化後的 loss 尺度顯著下降，最佳驗證落在第 47 epoch，後期維持 0.04 左右。  
+- 在轉 Mel 之前做 waveform z-score，loss 尺度顯著下降，最佳驗證落在第 47 epoch，後期維持 0.04 左右。  
 - `training_history.json` 可看到 train/val 曲線幾乎重疊，顯示 normalization 提升穩定度。  
 - 新增的 inference 輸出 `outputs/test_inference_v2_norm/enhanced_050.wav`（副本 `examples/codebook_align_inference/boy1_WOLDV_050_enhanced_v2_norm.wav`）可與舊版本對照。
 
 ### 📝 補充紀錄
-1. **Dataset 正規化旗標**：在 `OpticalDataset` 中加入 per-band z-score，並透過 `--normalize-mel` 控制；`start_training_v2.sh` 預設開啟。  
+1. **Dataset 正規化旗標**：在 `OpticalDataset` 中加入 waveform z-score（mean=0、std=1），並透過 `--normalize-waveform` 控制；`start_training_v2.sh` 預設開啟。  
 2. **tmux/Docker 流程**：與 V2 相同，輸出 log 為 `outputs/optical_lora_v2_norm_r32_e100/training.log`。  
 3. **後續工作**：需要在乾淨 splits 上重新驗證，並計算客觀指標確認音質是否真的提升。  
 4. **樣本管理**：所有 inference wav 仍透過 Git LFS 追蹤，集中於 `examples/codebook_align_inference/`。

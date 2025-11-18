@@ -1,11 +1,11 @@
 # MiMo-Audio 實驗記錄
 
 ## 最新實驗 (2025-11-18)
-### 🧪 Encoder Fine-tuning V2 - Codebook Alignment + Mel Normalization
+### 🧪 Encoder Fine-tuning V2 - Codebook Alignment + Waveform Normalization
 **狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
 
 **執行方式**:
-- 訓練：`bash start_training_v2.sh`（已啟用 `--normalize-mel`）→ docker + tmux `finetune_v2`，輸出 `outputs/optical_lora_v2_norm_r32_e100/`
+- 訓練：`bash start_training_v2.sh`（啟用 `--normalize-waveform`，在轉 Mel 前將 waveform 正規化為 mean=0、std=1）→ docker + tmux `finetune_v2`，輸出 `outputs/optical_lora_v2_norm_r32_e100/`
 - 推論：`CHECKPOINT=outputs/optical_lora_v2_norm_r32_e100/best_model.pt INPUT=examples/optical/mix/boy1_WOLDV_050.wav OUTPUT=outputs/test_inference_v2_norm/enhanced_050.wav ./test_inference_docker.sh --no-tmux`
 
 **關鍵結果**:
@@ -15,9 +15,10 @@
 - 推論樣本：`outputs/test_inference_v2_norm/enhanced_050.wav`（另存 `examples/codebook_align_inference/boy1_WOLDV_050_enhanced_v2_norm.wav`）
 
 **洞察 / 待辦**:
-1. Normalize 版本顯示 loss 下降幅度明顯，需配合 SI-SDR/PESQ 驗證是否真的改善音質
+1. Waveform normalization 讓 loss 縮小、收斂更快，仍需配合 SI-SDR/PESQ 驗證主觀音質是否同步提升
 2. 建議使用同一 script 批次產線：`CHECKPOINT=outputs/optical_lora_v2_norm_r32_e100/best_model.pt bash test_inference_quick.sh`
-3. 下一步：修補 splits＋加入 early stopping，再重訓比較 norm vs non-norm 表現
+3. 下一步：修補 splits＋加入 early stopping，再重訓比較 waveform norm vs baseline 表現
+4. 若需回溯舊結果（Mel normalization），保留 `outputs/test_inference_v2/enhanced_050.wav` 以對照
 
 ---
 

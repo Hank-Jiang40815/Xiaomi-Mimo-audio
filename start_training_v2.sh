@@ -27,10 +27,10 @@ LR=5e-5
 LAMBDA_CODE=1.0
 LAMBDA_VQ=0.1
 TRAIN_LOG="$OUTPUT_DIR/training.log"
-NORMALIZE_MEL=true
+NORMALIZE_WAVEFORM=true
 NORMALIZE_FLAG=""
-if [ "$NORMALIZE_MEL" = true ]; then
-    NORMALIZE_FLAG="--normalize-mel"
+if [ "$NORMALIZE_WAVEFORM" = true ]; then
+    NORMALIZE_FLAG="--normalize-waveform"
 fi
 
 echo "配置："
@@ -41,7 +41,7 @@ echo "  📚 Epochs: $EPOCHS"
 echo "  📈 LR: $LR"
 echo "  💾 Output: $OUTPUT_DIR"
 echo "  ⚖️  lambda_code=$LAMBDA_CODE, lambda_vq=$LAMBDA_VQ"
-echo "  🎛️  Normalize Mel: $NORMALIZE_MEL"
+echo "  🎛️  Normalize Waveform: $NORMALIZE_WAVEFORM"
 echo ""
 
 # 檢查必要檔案
