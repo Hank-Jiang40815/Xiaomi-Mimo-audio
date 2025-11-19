@@ -399,6 +399,20 @@ def main():
     logger.info(f"📦 Batch: {args.batch_size} x {args.gradient_accumulation} = {args.batch_size * args.gradient_accumulation}")
     logger.info(f"📚 Epochs: {args.epochs}")
     logger.info(f"📈 LR: {args.lr}")
+    # 如果 split 資料夾有 hash 記錄，貼出資訊方便後續復現
+    split_hash_path = Path(args.data_dir) / 'split_hashes.json'
+    if split_hash_path.exists():
+        try:
+            with open(split_hash_path, 'r', encoding='utf-8') as f:
+                split_meta = json.load(f)
+            logger.info("\n📂 Using dataset split:")
+            logger.info(f"   • manifest : {split_meta.get('manifest')}")
+            logger.info(f"   • seed      : {split_meta.get('seed')}")
+            logger.info(f"   • generated : {split_meta.get('generated_at')}")
+            for split_name, payload in split_meta.get('splits', {}).items():
+                logger.info(f"   • {split_name:5s}: total={payload.get('total')} hash={payload.get('combined_hash')}")
+        except Exception as err:
+            logger.warning(f"⚠️  Failed to read split hash file at {split_hash_path}: {err}")
     
     # 載入模型
     logger.info("\n1️⃣ Loading MiMo-Audio-Tokenizer...")

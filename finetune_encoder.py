@@ -312,6 +312,19 @@ def main():
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logger.info(f"Using device: {device}")
+    split_hash_path = Path(args.train_split).parent / 'split_hashes.json'
+    if split_hash_path.exists():
+        try:
+            with open(split_hash_path, 'r', encoding='utf-8') as f:
+                split_meta = json.load(f)
+            logger.info("📂 Using dataset split:")
+            logger.info(f"   • manifest : {split_meta.get('manifest')}")
+            logger.info(f"   • seed      : {split_meta.get('seed')}")
+            logger.info(f"   • generated : {split_meta.get('generated_at')}")
+            for split_name, payload in split_meta.get('splits', {}).items():
+                logger.info(f"   • {split_name:5s}: total={payload.get('total')} hash={payload.get('combined_hash')}")
+        except Exception as err:
+            logger.warning(f"⚠️  Failed to read split hash file at {split_hash_path}: {err}")
     
     logger.info(f"Loading tokenizer from {args.tokenizer_path}")
     tokenizer = MiMoAudioTokenizer.from_pretrained(args.tokenizer_path)
