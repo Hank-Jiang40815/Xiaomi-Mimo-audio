@@ -11,7 +11,7 @@
 **關鍵結果**:
 - Train Loss: 21.3 → 0.35；Val Loss: 7.78 → 0.33（最佳 0.33 @ epoch 100，仍有震盪）
 - Checkpoints：`best_model.pt` + 每 10 epoch 快照；`training_history.json` 新增 100-epoch loss trace
-- 推論樣本：`outputs/test_inference_normbeforemel_v2/enhanced_050.wav`
+- 推論樣本：`outputs/test_inference_normbeforemel_v2/enhanced_050.wav`（另存 `examples/codebook_align_inference/boy1_WOLDV_050_enhanced_v2_normbeforemel_v2.wav`）
 
 **洞察 / 待辦**:
 1. 仍可見多次梯度爆衝（Val loss >10），推測 batch variance 過大；下一輪嘗試降低 LR 或加入 grad clipping
