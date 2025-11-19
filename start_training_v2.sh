@@ -17,7 +17,7 @@ echo ""
 # 配置
 DATA_DIR="./data/splits/finetune_optical"
 TOKENIZER="./models/MiMo-Audio-Tokenizer"
-OUTPUT_DIR="./outputs/optical_lora_v2_norm_r32_e100"
+OUTPUT_DIR="./outputs/optical_lora_v2_normbeforemel_r32_e100_v2"
 RANK=32
 ALPHA=64
 BATCH_SIZE=8

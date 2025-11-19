@@ -19,17 +19,17 @@ echo "=========================================="
 echo ""
 
 # 配置 (可透過環境變數覆蓋)
-CHECKPOINT="${CHECKPOINT:-outputs/optical_lora_r32_e100/best_model.pt}"
+CHECKPOINT="${CHECKPOINT:-outputs/optical_lora_v2_normbeforemel_r32_e100_v2/best_model.pt}"
 TOKENIZER="${TOKENIZER:-models/MiMo-Audio-Tokenizer}"
 INPUT="${INPUT:-examples/optical/mix/boy1_WOLDV_050.wav}"
-OUTPUT="${OUTPUT:-outputs/test_inference/enhanced_050.wav}"
+OUTPUT="${OUTPUT:-outputs/test_inference_normbeforemel_v2/enhanced_050.wav}"
 
 # 檢查文件
 echo "📋 檢查必要文件..."
 
 if [ ! -f "$CHECKPOINT" ]; then
     echo "⚠️  best_model.pt 不存在，嘗試使用 checkpoint_epoch_2.pt"
-    CHECKPOINT="outputs/optical_lora_r32_e100/checkpoint_epoch_2.pt"
+    CHECKPOINT="outputs/optical_lora_v2_normbeforemel_r32_e100_v2/checkpoint_epoch_2.pt"
 fi
 
 if [ ! -f "$CHECKPOINT" ]; then
@@ -162,11 +162,13 @@ else
     fi
 fi
 
-echo "✅ tmux session '$SESSION_NAME' 已啟動"
-echo ""
-echo "📺 連接到 session 查看輸出："
-echo "   tmux attach -t $SESSION_NAME"
-echo ""
-echo "或等待幾秒後自動連接..."
-sleep 2
-tmux attach -t "$SESSION_NAME"
+if [ "$USE_TMUX" = true ]; then
+    echo "✅ tmux session '$SESSION_NAME' 已啟動"
+    echo ""
+    echo "📺 連接到 session 查看輸出："
+    echo "   tmux attach -t $SESSION_NAME"
+    echo ""
+    echo "或等待幾秒後自動連接..."
+    sleep 2
+    tmux attach -t "$SESSION_NAME"
+fi

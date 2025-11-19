@@ -1,6 +1,26 @@
 # MiMo-Audio 實驗記錄
 
-## 最新實驗 (2025-11-18)
+## 最新實驗 (2025-11-19)
+### 🧪 Encoder Fine-tuning V2 - Waveform Normalization (pre-Mel) v2
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 訓練：`bash start_training_v2.sh`（`OUTPUT_DIR=outputs/optical_lora_v2_normbeforemel_r32_e100_v2`，預設啟用 `--normalize-waveform`）→ docker + tmux `finetune_v2`
+- 推論：`CHECKPOINT=outputs/optical_lora_v2_normbeforemel_r32_e100_v2/best_model.pt INPUT=examples/optical/mix/boy1_WOLDV_050.wav OUTPUT=outputs/test_inference_normbeforemel_v2/enhanced_050.wav ./test_inference_docker.sh --no-tmux`
+
+**關鍵結果**:
+- Train Loss: 21.3 → 0.35；Val Loss: 7.78 → 0.33（最佳 0.33 @ epoch 100，仍有震盪）
+- Checkpoints：`best_model.pt` + 每 10 epoch 快照；`training_history.json` 新增 100-epoch loss trace
+- 推論樣本：`outputs/test_inference_normbeforemel_v2/enhanced_050.wav`
+
+**洞察 / 待辦**:
+1. 仍可見多次梯度爆衝（Val loss >10），推測 batch variance 過大；下一輪嘗試降低 LR 或加入 grad clipping
+2. waveform normalization 放在 Mel 前效果尚未顯著優於 11/18 版本，需客觀 SI-SDR/PESQ 檢查
+3. 若要與先前 run 對照，保留 `outputs/optical_lora_v2_norm_r32_e100/` 與 `outputs/test_inference_v2_norm/`，勿覆蓋
+
+---
+
+## 過往實驗 (2025-11-18)
 ### 🧪 Encoder Fine-tuning V2 - Codebook Alignment + Waveform Normalization
 **狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
 
