@@ -30,7 +30,7 @@
 
 **關鍵結果**:
 - Train Loss: 6.06 → 0.063；Val Loss: 3.14 → 0.040（最佳 0.033 @ epoch 47）
-- Mel per-band z-score 正規化讓 loss 尺度下降、收斂更快；最佳點出現在中段
+- Waveform normalization（轉 Mel 前做 mean/std）讓 loss 尺度下降、收斂更快；未實作 per-band z-score
 - Checkpoints：`best_model.pt` + 每 10 epoch 快照；新 log `training_history.json`
 - 推論樣本：`outputs/test_inference_v2_norm/enhanced_050.wav`（另存 `examples/codebook_align_inference/boy1_WOLDV_050_enhanced_v2_norm.wav`）
 

@@ -22,6 +22,7 @@ import json
 import torchaudio
 from tqdm import tqdm
 import logging
+import random
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -312,6 +313,28 @@ class OpticalDataset(Dataset):
         }
 
 
+def log_dataset_stats(dataset: Dataset, name: str, sample_count: int = 32):
+    """抽樣統計 mel 的 mean/std/length，檢查前處理是否穩定。"""
+    total = len(dataset)
+    if total == 0:
+        logger.warning(f"{name}: dataset is empty, skip stats.")
+        return
+    k = min(sample_count, total)
+    indices = random.sample(range(total), k)
+    means = []
+    stds = []
+    lengths = []
+    for idx in indices:
+        sample = dataset[idx]
+        mel = sample['noisy_audio']
+        means.append(float(mel.mean()))
+        stds.append(float(mel.std()))
+        lengths.append(mel.shape[1])
+    def fmt(arr):
+        return f"mean={sum(arr)/len(arr):.4f}, min={min(arr):.4f}, max={max(arr):.4f}"
+    logger.info(f"📊 {name} noisy mel stats (n={k}): {fmt(means)}; std: {fmt(stds)}; length: mean={sum(lengths)/len(lengths):.1f}, min={min(lengths)}, max={max(lengths)}")
+
+
 def train_one_epoch(
     encoder,
     dataloader,
@@ -469,6 +492,11 @@ def main():
     logger.info("\n1️⃣ Loading MiMo-Audio-Tokenizer...")
     tokenizer = MiMoAudioTokenizer.from_pretrained(args.tokenizer_path)
     tokenizer = tokenizer.to(device).to(torch.bfloat16)
+    try:
+        n_q = len(tokenizer.encoder.quantizer.vq.layers)
+        logger.info(f"🔢 Quantizer layers (n_q): {n_q}")
+    except Exception as err:
+        logger.warning(f"⚠️ 無法讀取 quantizer 層數: {err}")
     
     # 注入 LoRA
     logger.info("\n2️⃣ Injecting LoRA to Encoder...")
@@ -486,6 +514,9 @@ def main():
         split='val',
         normalize_waveform=args.normalize_waveform,
     )
+
+    log_dataset_stats(train_dataset, "Train", sample_count=32)
+    log_dataset_stats(val_dataset, "Val", sample_count=16)
 
     if args.normalize_waveform:
         logger.info("🎛️  Enabled waveform normalization (mean 0, std 1) before Mel conversion")
