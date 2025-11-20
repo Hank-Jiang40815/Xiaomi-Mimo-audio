@@ -55,3 +55,16 @@ examples/audio_enhancement_result*.wav
 
 # 測試和訓練日誌
 *.log
+examples/boy1_papercup_LDV_x65_289_norl.wav
+examples/boy1_papercup_LDV_x65_289.wav
+examples/boy1_papercup_LDV_x65_290_norl.wav
+examples/boy1_papercup_LDV_x65_290.wav
+examples/boy1_papercup_LDV_x65_291_norl.wav
+examples/boy1_papercup_LDV_x65_291.wav
+examples/boy1_papercup_LDV_x70_299_norl.wav
+examples/boy1_papercup_LDV_x70_299.wav
+examples/boy1_papercup_LDV_x70_300_norl.wav
+examples/boy1_papercup_LDV_x70_300.wav
+examples/boy1_papercup_LDV_x70_301_norl.wav
+examples/boy1_papercup_LDV_x70_301.wav
+chat_gemini.py
