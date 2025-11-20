@@ -98,8 +98,6 @@ def compute_codebook_aware_loss(
     lambda_code=1.0,
     lambda_vq=0.1,
     lambda_code_index=0.0,
-    index_layers: int = 4,
-    index_temperature: float = 0.5,
 ):
     """
     改進的損失函數：Codebook-Aware Loss
@@ -185,21 +183,14 @@ def compute_codebook_aware_loss(
         
         code_index_loss = torch.tensor(0.0, device=device, dtype=feature_loss.dtype)
         if lambda_code_index > 0:
-            # 僅對前 index_layers 層做蒸餾式對齊（soft target with temperature）
-            kl_losses = []
-            per_layer = []
-            max_layers = min(index_layers, len(logits_per_layer))
-            for idx in range(max_layers):
-                logits_noisy = logits_per_layer[idx].to(torch.float32)
-                logits_clean = logits_per_layer[idx].detach().to(torch.float32)
-                # soft targets from clean logits
-                target_prob = F.softmax(logits_clean / index_temperature, dim=1)
-                log_prob = F.log_softmax(logits_noisy / index_temperature, dim=1)
-                kl = F.kl_div(log_prob, target_prob, reduction='batchmean') * (index_temperature ** 2)
-                kl_losses.append(kl)
-                per_layer.append(kl.detach())
-            if kl_losses:
-                code_index_loss = torch.stack(kl_losses).mean().to(feature_loss.dtype)
+            ce_losses = []
+            flat_clean_codes = clean_codes.reshape(clean_codes.shape[0], -1)
+            for idx, logits in enumerate(logits_per_layer):
+                targets = flat_clean_codes[idx].reshape(-1).to(device)
+                ce = F.cross_entropy(logits.to(torch.float32), targets.long())
+                ce_losses.append(ce)
+            if ce_losses:
+                code_index_loss = torch.stack(ce_losses).mean().to(feature_loss.dtype)
         
         # === 3. Perceptual Loss (optional) ===
         # 使用不同層的特徵（如果有 skip connection）
@@ -354,8 +345,6 @@ def train_one_epoch(
     lambda_code=1.0,
     lambda_vq=0.1,
     lambda_code_index=0.0,
-    index_layers: int = 4,
-    index_temperature: float = 0.5,
 ):
     encoder.train()
     total_loss = 0.0
@@ -381,8 +370,6 @@ def train_one_epoch(
             lambda_code=lambda_code,
             lambda_vq=lambda_vq,
             lambda_code_index=lambda_code_index,
-            index_layers=index_layers,
-            index_temperature=index_temperature,
         )
         
         # Gradient accumulation
@@ -417,16 +404,7 @@ def train_one_epoch(
 
 
 @torch.no_grad()
-def validate(
-    encoder,
-    dataloader,
-    device,
-    lambda_code=1.0,
-    lambda_vq=0.1,
-    lambda_code_index=0.0,
-    index_layers: int = 4,
-    index_temperature: float = 0.5,
-):
+def validate(encoder, dataloader, device, lambda_code=1.0, lambda_vq=0.1, lambda_code_index=0.0):
     encoder.eval()
     total_loss = 0.0
     total_feat_loss = 0.0
@@ -447,8 +425,6 @@ def validate(
             lambda_code=lambda_code,
             lambda_vq=lambda_vq,
             lambda_code_index=lambda_code_index,
-            index_layers=index_layers,
-            index_temperature=index_temperature,
         )
         
         total_loss += loss.item()
@@ -480,8 +456,6 @@ def main():
     parser.add_argument('--lambda-code', type=float, default=1.0, help='Weight for codebook alignment loss')
     parser.add_argument('--lambda-vq', type=float, default=0.1, help='Weight for quantizer commit loss')
     parser.add_argument('--lambda-code-index', type=float, default=0.0, help='Weight for discrete code index alignment loss')
-    parser.add_argument('--index-layers', type=int, default=4, help='Number of RVQ layers to apply index (distillation) loss')
-    parser.add_argument('--index-temperature', type=float, default=0.5, help='Temperature for softened index distillation targets')
     parser.add_argument('--normalize-waveform', action='store_true', help='Normalize waveform (mean=0, std=1) before computing Mel spectrogram')
     
     args = parser.parse_args()
@@ -499,7 +473,6 @@ def main():
     logger.info(f"📦 Batch: {args.batch_size} x {args.gradient_accumulation} = {args.batch_size * args.gradient_accumulation}")
     logger.info(f"📚 Epochs: {args.epochs}")
     logger.info(f"📈 LR: {args.lr}")
-    logger.info(f"🧊 Index loss: lambda_code_index={args.lambda_code_index}, layers={args.index_layers}, temperature={args.index_temperature}")
     # 如果 split 資料夾有 hash 記錄，貼出資訊方便後續復現
     split_hash_path = Path(args.data_dir) / 'split_hashes.json'
     if split_hash_path.exists():
@@ -592,8 +565,6 @@ def main():
             lambda_code=args.lambda_code,
             lambda_vq=args.lambda_vq,
             lambda_code_index=args.lambda_code_index,
-            index_layers=args.index_layers,
-            index_temperature=args.index_temperature,
         )
         
         val_loss, val_feat, val_code, val_code_idx = validate(
@@ -603,8 +574,6 @@ def main():
             lambda_code=args.lambda_code,
             lambda_vq=args.lambda_vq,
             lambda_code_index=args.lambda_code_index,
-            index_layers=args.index_layers,
-            index_temperature=args.index_temperature,
         )
         
         logger.info(
