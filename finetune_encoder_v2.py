@@ -96,6 +96,7 @@ def compute_codebook_aware_loss(
     lambda_feat=1.0,
     lambda_code=1.0,
     lambda_vq=0.1,
+    lambda_code_index=0.0,
 ):
     """
     改進的損失函數：Codebook-Aware Loss
@@ -138,6 +139,9 @@ def compute_codebook_aware_loss(
         quantizer = getattr(encoder, "quantizer", None)
         if quantizer is None:
             raise ValueError("Encoder does not expose a quantizer; cannot run codebook-aware loss.")
+        rvq = getattr(quantizer, "vq", None)
+        if rvq is None:
+            raise ValueError("Quantizer missing RVQ module.")
         
         # quantizer 可能沒有參數（純 buffer 代碼本），因此需安全取得 dtype
         try:
@@ -146,15 +150,46 @@ def compute_codebook_aware_loss(
             quantizer_buffer = next(quantizer.buffers(), None)
             quantizer_dtype = quantizer_buffer.dtype if quantizer_buffer is not None else noisy_features.dtype
         noisy_flat = noisy_features.reshape(-1, noisy_features.shape[-1]).to(quantizer_dtype)
-        quantized_noisy, _, vq_commit_loss, _ = quantizer(noisy_flat)
-        quantized_noisy = quantized_noisy.view_as(noisy_features)
-        
+        clean_flat = clean_features.reshape(-1, clean_features.shape[-1]).to(quantizer_dtype)
+
+        # 逐層量化以取得 quantized 輸出與 logits
+        residual = noisy_flat
+        quantized_layers = []
+        commit_losses = []
+        logits_per_layer = []
+        for layer in rvq.layers:
+            projected = layer.project_in(residual)
+            codebook = layer._codebook.embed.detach().to(projected.dtype)
+            proj_norm = projected.pow(2).sum(dim=1, keepdim=True)
+            embed_norm = codebook.pow(2).sum(dim=1).unsqueeze(0)
+            logits = -(proj_norm - 2 * projected @ codebook.t() + embed_norm)
+            logits_per_layer.append(logits)
+
+            quantized_layer, _, commit_loss_layer = layer(residual)
+            quantized_layers.append(quantized_layer)
+            commit_losses.append(commit_loss_layer)
+            residual = residual - quantized_layer
+
+        quantized_noisy_flat = torch.stack(quantized_layers).sum(dim=0)
+        quantized_noisy = quantized_noisy_flat.view_as(noisy_features)
+        vq_commit_loss = torch.stack(commit_losses).mean()
+
         with torch.no_grad():
-            clean_flat = clean_features.reshape(-1, clean_features.shape[-1]).to(quantizer_dtype)
-            quantized_clean, _, _, _ = quantizer(clean_flat)
-            quantized_clean = quantized_clean.view_as(clean_features)
+            quantized_clean_flat, clean_codes, _, _ = quantizer(clean_flat)
+            quantized_clean = quantized_clean_flat.view_as(clean_features)
         
         code_loss = F.l1_loss(quantized_noisy, quantized_clean)
+        
+        code_index_loss = torch.tensor(0.0, device=device, dtype=feature_loss.dtype)
+        if lambda_code_index > 0:
+            ce_losses = []
+            flat_clean_codes = clean_codes.reshape(clean_codes.shape[0], -1)
+            for idx, logits in enumerate(logits_per_layer):
+                targets = flat_clean_codes[idx].reshape(-1).to(device)
+                ce = F.cross_entropy(logits.to(torch.float32), targets.long())
+                ce_losses.append(ce)
+            if ce_losses:
+                code_index_loss = torch.stack(ce_losses).mean().to(feature_loss.dtype)
         
         # === 3. Perceptual Loss (optional) ===
         # 使用不同層的特徵（如果有 skip connection）
@@ -165,9 +200,10 @@ def compute_codebook_aware_loss(
             lambda_feat * feature_loss
             + lambda_code * code_loss
             + lambda_vq * vq_commit_loss
+            + lambda_code_index * code_index_loss
         )
     
-    return total_loss, feature_loss, code_loss
+    return total_loss, feature_loss, code_loss, code_index_loss
 
 
 class OpticalDataset(Dataset):
@@ -285,11 +321,13 @@ def train_one_epoch(
     gradient_accumulation_steps=1,
     lambda_code=1.0,
     lambda_vq=0.1,
+    lambda_code_index=0.0,
 ):
     encoder.train()
     total_loss = 0.0
     total_feat_loss = 0.0
     total_code_loss = 0.0
+    total_code_index_loss = 0.0
     num_batches = 0
     
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch}")
@@ -300,7 +338,7 @@ def train_one_epoch(
         clean_audio = batch['clean_audio'].to(device)
         
         # 計算損失
-        loss, feat_loss, code_loss = compute_codebook_aware_loss(
+        loss, feat_loss, code_loss, code_index = compute_codebook_aware_loss(
             encoder,
             noisy_audio,
             clean_audio,
@@ -308,6 +346,7 @@ def train_one_epoch(
             lambda_feat=1.0,
             lambda_code=lambda_code,
             lambda_vq=lambda_vq,
+            lambda_code_index=lambda_code_index,
         )
         
         # Gradient accumulation
@@ -322,35 +361,39 @@ def train_one_epoch(
         total_loss += loss.item() * gradient_accumulation_steps
         total_feat_loss += feat_loss.item()
         total_code_loss += code_loss.item()
+        total_code_index_loss += code_index.item()
         num_batches += 1
         
         progress_bar.set_postfix({
             'loss': f'{loss.item() * gradient_accumulation_steps:.4f}',
             'feat': f'{feat_loss.item():.4f}',
             'code': f'{code_loss.item():.4f}',
+            'code_idx': f'{code_index.item():.4f}',
             'avg_loss': f'{total_loss/num_batches:.4f}'
         })
     
     avg_loss = total_loss / num_batches
     avg_feat = total_feat_loss / num_batches
     avg_code = total_code_loss / num_batches
+    avg_code_index = total_code_index_loss / num_batches
     
-    return avg_loss, avg_feat, avg_code
+    return avg_loss, avg_feat, avg_code, avg_code_index
 
 
 @torch.no_grad()
-def validate(encoder, dataloader, device, lambda_code=1.0, lambda_vq=0.1):
+def validate(encoder, dataloader, device, lambda_code=1.0, lambda_vq=0.1, lambda_code_index=0.0):
     encoder.eval()
     total_loss = 0.0
     total_feat_loss = 0.0
     total_code_loss = 0.0
+    total_code_index_loss = 0.0
     num_batches = 0
     
     for batch in tqdm(dataloader, desc="Validation"):
         noisy_audio = batch['noisy_audio'].to(device)
         clean_audio = batch['clean_audio'].to(device)
         
-        loss, feat_loss, code_loss = compute_codebook_aware_loss(
+        loss, feat_loss, code_loss, code_index = compute_codebook_aware_loss(
             encoder,
             noisy_audio,
             clean_audio,
@@ -358,14 +401,21 @@ def validate(encoder, dataloader, device, lambda_code=1.0, lambda_vq=0.1):
             lambda_feat=1.0,
             lambda_code=lambda_code,
             lambda_vq=lambda_vq,
+            lambda_code_index=lambda_code_index,
         )
         
         total_loss += loss.item()
         total_feat_loss += feat_loss.item()
         total_code_loss += code_loss.item()
+        total_code_index_loss += code_index.item()
         num_batches += 1
     
-    return total_loss / num_batches, total_feat_loss / num_batches, total_code_loss / num_batches
+    return (
+        total_loss / num_batches,
+        total_feat_loss / num_batches,
+        total_code_loss / num_batches,
+        total_code_index_loss / num_batches,
+    )
 
 
 def main():
@@ -382,6 +432,7 @@ def main():
     parser.add_argument('--save-every', type=int, default=10)
     parser.add_argument('--lambda-code', type=float, default=1.0, help='Weight for codebook alignment loss')
     parser.add_argument('--lambda-vq', type=float, default=0.1, help='Weight for quantizer commit loss')
+    parser.add_argument('--lambda-code-index', type=float, default=0.0, help='Weight for discrete code index alignment loss')
     parser.add_argument('--normalize-waveform', action='store_true', help='Normalize waveform (mean=0, std=1) before computing Mel spectrogram')
     
     args = parser.parse_args()
@@ -459,12 +510,21 @@ def main():
     logger.info("=" * 80)
     
     best_val_loss = float('inf')
-    history = {'train_loss': [], 'val_loss': [], 'train_feat': [], 'train_code': []}
+    history = {
+        'train_loss': [],
+        'val_loss': [],
+        'train_feat': [],
+        'val_feat': [],
+        'train_code': [],
+        'val_code': [],
+        'train_code_idx': [],
+        'val_code_idx': [],
+    }
     
     for epoch in range(1, args.epochs + 1):
         logger.info(f"\nEpoch {epoch}/{args.epochs}")
         
-        train_loss, train_feat, train_code = train_one_epoch(
+        train_loss, train_feat, train_code, train_code_idx = train_one_epoch(
             tokenizer.encoder,
             train_loader,
             optimizer,
@@ -473,23 +533,41 @@ def main():
             gradient_accumulation_steps=args.gradient_accumulation,
             lambda_code=args.lambda_code,
             lambda_vq=args.lambda_vq,
+            lambda_code_index=args.lambda_code_index,
         )
         
-        val_loss, val_feat, val_code = validate(
+        val_loss, val_feat, val_code, val_code_idx = validate(
             tokenizer.encoder,
             val_loader,
             device,
             lambda_code=args.lambda_code,
             lambda_vq=args.lambda_vq,
+            lambda_code_index=args.lambda_code_index,
         )
         
-        logger.info(f"📊 Train Loss: {train_loss:.4f} (feat={train_feat:.4f}, code={train_code:.4f})")
-        logger.info(f"📊 Val Loss:   {val_loss:.4f} (feat={val_feat:.4f}, code={val_code:.4f})")
+        logger.info(
+            "📊 Train Loss: %.4f (feat=%.4f, code=%.4f, code_idx=%.4f)",
+            train_loss,
+            train_feat,
+            train_code,
+            train_code_idx,
+        )
+        logger.info(
+            "📊 Val Loss:   %.4f (feat=%.4f, code=%.4f, code_idx=%.4f)",
+            val_loss,
+            val_feat,
+            val_code,
+            val_code_idx,
+        )
         
         history['train_loss'].append(train_loss)
         history['val_loss'].append(val_loss)
         history['train_feat'].append(train_feat)
+        history['val_feat'].append(val_feat)
         history['train_code'].append(train_code)
+        history['val_code'].append(val_code)
+        history['train_code_idx'].append(train_code_idx)
+        history['val_code_idx'].append(val_code_idx)
         
         # 保存最佳模型
         if val_loss < best_val_loss:

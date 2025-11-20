@@ -14,20 +14,21 @@ echo "  ✅ Codebook Alignment Loss (L1)"
 echo "  ✅ 確保 noisy→clean 映射到相同 codebook"
 echo ""
 
-# 配置
-DATA_DIR="./data/splits/finetune_optical"
-TOKENIZER="./models/MiMo-Audio-Tokenizer"
-OUTPUT_DIR="./outputs/optical_lora_v2_normbeforemel_r32_e100_v2"
-RANK=32
-ALPHA=64
-BATCH_SIZE=8
-GRAD_ACCUM=8
-EPOCHS=100
-LR=5e-5
-LAMBDA_CODE=1.0
-LAMBDA_VQ=0.1
+# 配置（允許透過環境變數覆寫）
+DATA_DIR="${DATA_DIR:-./data/splits/finetune_optical}"
+TOKENIZER="${TOKENIZER:-./models/MiMo-Audio-Tokenizer}"
+OUTPUT_DIR="${OUTPUT_DIR:-./outputs/optical_lora_v2_normbeforemel_r32_e100_v2}"
+RANK="${RANK:-32}"
+ALPHA="${ALPHA:-64}"
+BATCH_SIZE="${BATCH_SIZE:-8}"
+GRAD_ACCUM="${GRAD_ACCUM:-8}"
+EPOCHS="${EPOCHS:-100}"
+LR="${LR:-5e-5}"
+LAMBDA_CODE="${LAMBDA_CODE:-1.0}"
+LAMBDA_VQ="${LAMBDA_VQ:-0.1}"
+LAMBDA_CODE_INDEX="${LAMBDA_CODE_INDEX:-0.0}"
 TRAIN_LOG="$OUTPUT_DIR/training.log"
-NORMALIZE_WAVEFORM=true
+NORMALIZE_WAVEFORM=${NORMALIZE_WAVEFORM:-true}
 NORMALIZE_FLAG=""
 if [ "$NORMALIZE_WAVEFORM" = true ]; then
     NORMALIZE_FLAG="--normalize-waveform"
@@ -40,7 +41,7 @@ echo "  📦 Batch: $BATCH_SIZE × $GRAD_ACCUM = $((BATCH_SIZE * GRAD_ACCUM))"
 echo "  📚 Epochs: $EPOCHS"
 echo "  📈 LR: $LR"
 echo "  💾 Output: $OUTPUT_DIR"
-echo "  ⚖️  lambda_code=$LAMBDA_CODE, lambda_vq=$LAMBDA_VQ"
+echo "  ⚖️  lambda_code=$LAMBDA_CODE, lambda_vq=$LAMBDA_VQ, lambda_code_index=$LAMBDA_CODE_INDEX"
 echo "  🎛️  Normalize Waveform: $NORMALIZE_WAVEFORM"
 echo ""
 
@@ -93,6 +94,7 @@ tmux new-session -d -s "$SESSION_NAME" bash -c "
         --lr $LR \
         --lambda-code $LAMBDA_CODE \
         --lambda-vq $LAMBDA_VQ \
+        --lambda-code-index $LAMBDA_CODE_INDEX \
         $NORMALIZE_FLAG \
         --save-every 10 \
         2>&1 | tee \"$TRAIN_LOG\"
