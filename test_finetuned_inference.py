@@ -114,30 +114,25 @@ def enhance_audio(model, input_audio_path, output_audio_path, device='cuda'):
     ).to(device)
     
     waveform_gpu = waveform.to(device)
-    mel_raw = mel_transform(waveform_gpu)  # [1, 128, T]
-    
-    # **關鍵：使用 MimoAudio 的格式 [T, 128]**
-    mel = torch.log(torch.clip(mel_raw, min=1e-7)).squeeze(0).transpose(0, 1)  # [T, 128]
-    print(f"   Mel Spectrogram Shape: {mel.shape}")  # [T, 128]
+    mel = mel_transform(waveform_gpu)  # [1, 128, T]
+    print(f"   Mel Spectrogram Shape: {mel.shape}")  # [1, 128, T]
     
     # 3. 編碼（使用微調後的 encoder）
     print("\n3️⃣ 使用微調後的 Encoder 編碼...")
     
     with torch.no_grad():
         # 使用 MimoAudio 的分段方式
-        input_len = mel.size(0)
-        segment_size = 6000
-        input_len_seg = [segment_size] * (input_len // segment_size)
-        if input_len % segment_size > 0:
-            input_len_seg.append(input_len % segment_size)
+        # 準備 packed 格式 [T, n_mels] 以符合 encoder.encode 的預期
+        mel_packed = mel.squeeze(0).transpose(0, 1).contiguous().to(torch.bfloat16)  # [T, 128]
+        input_len = torch.tensor([mel_packed.shape[0]], device=device)
+        print(f"   Mel length: {int(input_len.item())}")
         
-        print(f"   Segments: {input_len_seg}")
-        
-        # 使用 AudioEncoder.encode（微調後的）
+        # 使用 AudioEncoder.encode（與訓練一致的 API）
         codes, output_length = model.encoder.encode(
-            input_features=mel.to(torch.bfloat16),
-            input_lens=torch.tensor(input_len_seg, device=device),
-            return_codes_only=True
+            input_features=mel_packed,
+            input_lens=input_len,
+            return_codes_only=True,
+            use_quantizer=True
         )
         
         print(f"   Codes Shape: {codes.shape}")  # [num_quantizers, T']
