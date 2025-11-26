@@ -160,8 +160,13 @@ def encode_waveforms_to_codes(tokenizer: MiMoAudioTokenizer, waveforms: torch.Te
 
 
 def collate_codes(batch, tokenizer: MiMoAudioTokenizer, device: torch.device):
-    noisy_wavs = torch.stack([b["noisy_waveform"] for b in batch], dim=0).to(device)  # [B, 1, S]
-    clean_wavs = torch.stack([b["clean_waveform"] for b in batch], dim=0).to(device)
+    """
+    DataLoader 預設會把 list[dict] collate 成 dict of tensors：
+      batch["noisy_waveform"]: [B, 1, S]
+    這裡直接取 dict 形式，不再當成 list 迭代。
+    """
+    noisy_wavs = batch["noisy_waveform"].to(device)   # [B, 1, S]
+    clean_wavs = batch["clean_waveform"].to(device)   # [B, 1, S]
     noisy_codes = encode_waveforms_to_codes(tokenizer, noisy_wavs, device)
     clean_codes = encode_waveforms_to_codes(tokenizer, clean_wavs, device)
     return noisy_codes, clean_codes
