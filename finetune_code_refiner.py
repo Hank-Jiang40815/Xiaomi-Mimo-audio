@@ -142,7 +142,7 @@ def encode_waveforms_to_codes(tokenizer: MiMoAudioTokenizer, waveforms: torch.Te
             f_max=float(cfg.sampling_rate // 2),
         ).to(device)
         # waveforms: [B, 1, S] -> [B, n_mels, T]
-        mels = mel_transform(waveforms).squeeze(1)
+        mels = mel_transform(waveforms).squeeze(1).to(device)
         B, n_mels, T = mels.shape
         input_lens = torch.full((B,), T, device=device, dtype=torch.long)
 
@@ -252,7 +252,7 @@ def main():
 
     logger.info("Loading tokenizer from %s", args.tokenizer_path)
     tokenizer = MiMoAudioTokenizer.from_pretrained(args.tokenizer_path)
-    tokenizer = tokenizer.to(device).eval()
+    tokenizer = tokenizer.to(device).to(torch.bfloat16).eval()
 
     # 取得第一個 quantizer 的 codebook size 作為 refiner 的 vocab
     q = tokenizer.encoder.quantizer.vq.layers[0]
