@@ -179,6 +179,7 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     epoch: int,
+    num_layers_used: int,
 ):
     tokenizer.eval()
     refiner.train()
@@ -187,15 +188,17 @@ def train_one_epoch(
     pbar = tqdm(dataloader, desc=f"Epoch {epoch}")
     for batch in pbar:
         noisy_codes, clean_codes = collate_codes(batch, tokenizer, device)
-        # 目前只處理第一個 quantizer 層，簡化實驗
-        noisy = noisy_codes[0].to(device)  # [T_flat]
-        clean = clean_codes[0].to(device)
-        # 假設所有樣本展平成同一長度，這裡直接視為 batch=1 序列
-        noisy = noisy.unsqueeze(0)
-        clean = clean.unsqueeze(0)
-
-        logits = refiner(noisy)  # [1, T, codebook_size]
-        loss = F.cross_entropy(logits.view(-1, refiner.codebook_size), clean.view(-1))
+        # 使用前 num_layers_used 個 quantizer 層，每層一個序列，loss 取平均
+        n_q = noisy_codes.shape[0]
+        layers = min(num_layers_used, n_q)
+        loss = 0.0
+        for q in range(layers):
+            noisy = noisy_codes[q].to(device).unsqueeze(0)  # [1, T]
+            clean = clean_codes[q].to(device).unsqueeze(0)
+            logits = refiner(noisy)  # [1, T, codebook_size]
+            loss_q = F.cross_entropy(logits.view(-1, refiner.codebook_size), clean.view(-1))
+            loss = loss + loss_q
+        loss = loss / layers
 
         optimizer.zero_grad()
         loss.backward()
@@ -215,6 +218,7 @@ def validate(
     refiner: CodeRefiner,
     dataloader: DataLoader,
     device: torch.device,
+    num_layers_used: int,
 ):
     tokenizer.eval()
     refiner.eval()
@@ -222,10 +226,16 @@ def validate(
     num_batches = 0
     for batch in tqdm(dataloader, desc="Validation"):
         noisy_codes, clean_codes = collate_codes(batch, tokenizer, device)
-        noisy = noisy_codes[0].to(device).unsqueeze(0)
-        clean = clean_codes[0].to(device).unsqueeze(0)
-        logits = refiner(noisy)
-        loss = F.cross_entropy(logits.view(-1, refiner.codebook_size), clean.view(-1))
+        n_q = noisy_codes.shape[0]
+        layers = min(num_layers_used, n_q)
+        loss = 0.0
+        for q in range(layers):
+            noisy = noisy_codes[q].to(device).unsqueeze(0)
+            clean = clean_codes[q].to(device).unsqueeze(0)
+            logits = refiner(noisy)
+            loss_q = F.cross_entropy(logits.view(-1, refiner.codebook_size), clean.view(-1))
+            loss = loss + loss_q
+        loss = loss / layers
         total_loss += loss.item()
         num_batches += 1
     return total_loss / max(num_batches, 1)
@@ -239,6 +249,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--num-quantizer-layers", type=int, default=4, help="How many RVQ layers to refine (from layer 0)")
     parser.add_argument("--projector-d-model", type=int, default=256)
     parser.add_argument("--projector-nhead", type=int, default=4)
     parser.add_argument("--projector-layers", type=int, default=2)
@@ -280,8 +291,8 @@ def main():
 
     for epoch in range(1, args.epochs + 1):
         logger.info("Epoch %d/%d", epoch, args.epochs)
-        train_loss = train_one_epoch(tokenizer, refiner, train_loader, optimizer, device, epoch)
-        val_loss = validate(tokenizer, refiner, val_loader, device)
+        train_loss = train_one_epoch(tokenizer, refiner, train_loader, optimizer, device, epoch, args.num_quantizer_layers)
+        val_loss = validate(tokenizer, refiner, val_loader, device, args.num_quantizer_layers)
         logger.info("Train Loss: %.4f", train_loss)
         logger.info("Val Loss:   %.4f", val_loss)
         history["train_loss"].append(train_loss)
