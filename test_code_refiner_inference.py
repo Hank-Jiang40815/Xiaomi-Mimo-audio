@@ -24,6 +24,7 @@ def main():
     ap.add_argument("--tokenizer-path", type=str, default="./models/MiMo-Audio-Tokenizer")
     ap.add_argument("--input", type=str, required=True)
     ap.add_argument("--output", type=str, required=True)
+    ap.add_argument("--num-quantizer-layers", type=int, default=1, help="How many RVQ layers to refine (from layer 0)")
     args = ap.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -52,12 +53,15 @@ def main():
     wav = wav.unsqueeze(0)  # [1, 1, S]
 
     with torch.no_grad():
-        codes = encode_waveforms_to_codes(tokenizer, wav, device)
-        noisy = codes[0].unsqueeze(0).to(device)  # [1, T]
-        logits = refiner(noisy)
-        refined = logits.argmax(dim=-1)  # [1, T]
+        codes = encode_waveforms_to_codes(tokenizer, wav, device)  # [n_q, T]
         refined_codes = codes.clone()
-        refined_codes[0] = refined.squeeze(0)
+        n_q = codes.shape[0]
+        layers = min(args.num_quantizer_layers, n_q)
+        for q in range(layers):
+            noisy = codes[q].unsqueeze(0).to(device)  # [1, T]
+            logits = refiner(noisy)
+            refined = logits.argmax(dim=-1)  # [1, T]
+            refined_codes[q] = refined.squeeze(0)
 
         # decode back to waveform
         hidden = tokenizer.encoder.decode_vq(refined_codes)
