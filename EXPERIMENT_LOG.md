@@ -1,5 +1,56 @@
 # MiMo-Audio 實驗記錄
 
+## 最新實驗 (2025-11-26)
+### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=4, E100)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 分支：`exp/code-refinement`
+- 訓練腳本：`finetune_code_refiner.py`
+- tmux + docker：
+  ```bash
+  tmux new -s code_refiner_e100 \
+    "docker run --gpus all --rm -v \"$(pwd)\":/workspace -w /workspace mimo-audio:latest \
+     bash -lc \"python finetune_code_refiner.py \
+       --data-dir ./data/splits/finetune_optical \
+       --tokenizer-path ./models/MiMo-Audio-Tokenizer \
+       --output-dir ./outputs/code_refiner_optical_e100_q4 \
+       --epochs 100 --batch-size 4 --lr 1e-4 --num-quantizer-layers 4\""
+  ```
+
+**架構與手法**:
+- 凍結：MiMo-Audio-Tokenizer 的 encoder + RVQ quantizer + decoder。
+- CodeRefiner：單一共享 Transformer (d_model=256, nhead=4, num_layers=2, ff=1024, dropout=0.1)，作用於離散 codes。
+- 資料流程：
+  - noisy/clean waveform → Mel（依 tokenizer config）→ encoder.get_features → quantizer → 得到 `codes_noisy`, `codes_clean`（形狀約 [n_q, T]）。
+  - 這次使用前 4 個 RVQ 層（N=4），對每一層 q：
+    - `logits_q = Refiner(codes_noisy[q])`，CE 對齊 `codes_clean[q]`。
+  - 總 loss 為 4 層 CE 的平均。
+
+**關鍵結果**:
+- 輸出目錄：`outputs/code_refiner_optical_e100_q4/`（`best_model.pt`、每 10 epoch checkpoint、`training_history.json`、`inference_boy1_001_refined.wav`）
+- 訓練指標：Epochs=100；Best Val Loss: **2.6557 @ epoch 90**；Final Val Loss: 2.6560
+- 單檔推理：
+  ```bash
+  python test_code_refiner_inference.py \
+    --checkpoint outputs/code_refiner_optical_e100_q4/best_model.pt \
+    --tokenizer-path models/MiMo-Audio-Tokenizer \
+    --input examples/optical/mix/boy1_WOLDV_001.wav \
+    --output outputs/code_refiner_optical_e100_q4/inference_boy1_001_refined.wav
+  ```
+
+**觀察 / 待辦**:
+1. 多層 (N=4) CE loss 穩定收斂至 ~2.66，優於單層版本（ppl 約從 ~16 降至 ~14 左右），但仍有不小 gap，說明 noisy→clean code 映射仍具不確定性。
+2. 需搭配主觀聽感與客觀指標（SI-SDR/PESQ/STOI）比較：
+   - Base tokenizer（無 refinement）
+   - 單層 CodeRefiner（outputs/code_refiner_optical_e100）
+   - 多層 CodeRefiner（本實驗）
+3. 若聽感顯示有改善，可考慮：
+   - 擴展到更多 RVQ 層或加入輕量聲學 loss（小權重 MR-STFT / SDR）。
+   - 加入 speaker/noise conditioning，讓映射更可控，而不是僅靠 codes pattern。
+
+---
+
 ## 最新實驗 (2025-11-19)
 ### 🧪 Encoder Fine-tuning V2 - Waveform Normalization (pre-Mel) v2
 **狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
