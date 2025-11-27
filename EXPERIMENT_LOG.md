@@ -135,6 +135,48 @@
 
 ---
 
+## 最新實驗 (2025-11-26)
+### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=16, E100)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 分支：`exp/code-refinement`
+- 訓練腳本：`finetune_code_refiner.py`
+- tmux + docker：
+  ```bash
+  tmux new -s code_refiner_e100_q16 \
+    "docker run --gpus all --rm -v \"$(pwd)\":/workspace -w /workspace mimo-audio:latest \
+     bash -lc \"python finetune_code_refiner.py \
+       --data-dir ./data/splits/finetune_optical \
+       --tokenizer-path ./models/MiMo-Audio-Tokenizer \
+       --output-dir ./outputs/code_refiner_optical_e100_q16 \
+       --epochs 100 --batch-size 4 --lr 1e-4 --num-quantizer-layers 16\""
+  ```
+
+**架構與手法**:
+- 與 N=4 / 8 / 12 相同：凍結 tokenizer，使用共享 Transformer Refiner (d_model=256, nhead=4, num_layers=2) 對前 N=16 個 RVQ 層做 code-level CE 對齊。
+- 對每層 q∈{0…15} 個別算 CE(noisy_q→clean_q)，總 loss 為 16 層 CE 的平均。
+
+**關鍵結果**:
+- 輸出目錄：`outputs/code_refiner_optical_e100_q16/`（`best_model.pt`、每 10 epoch checkpoint、`training_history.json`、`inference_boy1_001_refined.wav`）
+- 訓練指標：Epochs=100；Best Val Loss: **3.4898 @ epoch 94**；Final Val Loss: 3.4901（高於 N=12）
+- 單檔推理：
+  ```bash
+  python test_code_refiner_inference.py \
+    --checkpoint outputs/code_refiner_optical_e100_q16/best_model.pt \
+    --tokenizer-path models/MiMo-Audio-Tokenizer \
+    --input examples/optical/mix/boy1_WOLDV_001.wav \
+    --output outputs/code_refiner_optical_e100_q16/inference_boy1_001_refined.wav \
+    --num-quantizer-layers 16
+  ```
+
+**觀察 / 待辦**:
+1. N=16 的 Val CE 明顯高於 N=4/N=8，甚至高於 N=12，顯示對過多 RVQ 層進行 refinement 會增加學習難度且收益有限。
+2. 多層實驗（N=4/8/12/16）整體趨勢：N=4 最佳、N=8 輕微退化、N=12/16 持續變差。建議後續聚焦 N=4（或 N=1+N=4 對照）作為 CodeRefiner 主線。
+3. 未來方向：若要進一步提升，可優先嘗試選擇性 refinement（挑幾層關鍵 RVQ）、加入 speaker/noise conditioning，以及引入小權重聲學 loss，而不是繼續擴大 N。
+
+---
+
 ## 最新實驗 (2025-11-19)
 ### 🧪 Encoder Fine-tuning V2 - Waveform Normalization (pre-Mel) v2
 **狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
