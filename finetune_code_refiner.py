@@ -33,10 +33,19 @@ from src.mimo_audio_tokenizer import MiMoAudioTokenizer
 class OpticalCodeDataset(Dataset):
     """Optical noisy/clean waveform pairs -> lazy-encoded codes via frozen tokenizer."""
 
-    def __init__(self, manifest_dir: str, split: str = "train", sample_rate: int = 24000, max_length: float = 10.0):
+    def __init__(
+        self,
+        manifest_dir: str,
+        split: str = "train",
+        sample_rate: int = 24000,
+        max_length: float = 10.0,
+        normalize_waveform: bool = False,
+    ):
         self.manifest_dir = Path(manifest_dir)
         self.sample_rate = sample_rate
         self.max_samples = int(max_length * sample_rate)
+        self.normalize_waveform = normalize_waveform
+        self.eps = 1e-6
 
         manifest_path = self.manifest_dir / f"{split}.json"
         if not manifest_path.exists():
@@ -65,6 +74,12 @@ class OpticalCodeDataset(Dataset):
         elif num_samples < self.max_samples:
             pad = self.max_samples - num_samples
             wav = F.pad(wav, (0, pad))
+
+        if self.normalize_waveform:
+            mean = wav.mean()
+            std = wav.std().clamp_min(self.eps)
+            wav = (wav - mean) / std
+
         return wav
 
     def __getitem__(self, idx):
@@ -250,6 +265,11 @@ def main():
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--num-quantizer-layers", type=int, default=4, help="How many RVQ layers to refine (from layer 0)")
+    parser.add_argument(
+        "--normalize-waveform",
+        action="store_true",
+        help="Apply per-utterance waveform normalization (mean/std) before MelSpectrogram",
+    )
     parser.add_argument("--projector-d-model", type=int, default=256)
     parser.add_argument("--projector-nhead", type=int, default=4)
     parser.add_argument("--projector-layers", type=int, default=2)
@@ -279,8 +299,16 @@ def main():
         dropout=args.projector_dropout,
     ).to(device)
 
-    train_ds = OpticalCodeDataset(args.data_dir, split="train")
-    val_ds = OpticalCodeDataset(args.data_dir, split="val")
+    train_ds = OpticalCodeDataset(
+        args.data_dir,
+        split="train",
+        normalize_waveform=args.normalize_waveform,
+    )
+    val_ds = OpticalCodeDataset(
+        args.data_dir,
+        split="val",
+        normalize_waveform=args.normalize_waveform,
+    )
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=2)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=2)
 
