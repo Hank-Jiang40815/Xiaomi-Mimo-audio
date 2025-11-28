@@ -141,6 +141,53 @@
 
 ---
 
+## 最新實驗 (2025-11-28)
+### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=8, E100, WaveNorm)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 分支：`exp/code-refinement`
+- 訓練腳本：`finetune_code_refiner.py`
+- tmux + docker：
+  ```bash
+  tmux new -s code_refiner_e100_q8_norm \
+    "docker run --gpus all --rm -v \"$(pwd)\":/workspace -w /workspace mimo-audio:latest \
+     bash -lc \"python finetune_code_refiner.py \
+       --data-dir ./data/splits/finetune_optical \
+       --tokenizer-path ./models/MiMo-Audio-Tokenizer \
+       --output-dir ./outputs/code_refiner_optical_e100_q8_norm \
+       --epochs 100 --batch-size 4 --lr 1e-4 \
+       --num-quantizer-layers 8 \
+       --normalize-waveform\""
+  ```
+
+**架構與手法**:
+- 與原本 N=8 實驗相同：凍結 tokenizer，使用共享 Transformer Refiner (d_model=256, nhead=4, num_layers=2, ff=1024, dropout=0.1) 對前 8 個 RVQ 層做 code-level CE 對齊。
+- 差異點：在 `OpticalCodeDataset` 啟用 per-utterance waveform normalization，noisy/clean waveform 在轉 Mel 前先做 `(x - mean) / std`，其餘 Mel 與 tokenizer/quantizer 設定維持不變。
+- 資料流程：
+  - normalized noisy/clean waveform → Mel → encoder.get_features → quantizer → `codes_noisy`, `codes_clean`（約 [20, T]）。
+  - 使用前 8 個 RVQ 層（N=8），逐層 CE(noisy_q→clean_q)，總 loss 為 8 層 CE 的平均。
+
+**關鍵結果**:
+- 輸出目錄：`outputs/code_refiner_optical_e100_q8_norm/`（`best_model.pt`、每 10 epoch checkpoint、`training_history.json`、`inference_boy1_001_refined.wav`）
+- 訓練指標：Epochs=100；Best Val Loss: **3.0477 @ epoch 89**；Final Val Loss: 3.0480（明顯高於未做 WaveNorm 的 N=8 實驗，後者約為 2.78）
+- 單檔推理：
+  ```bash
+  python test_code_refiner_inference.py \
+    --checkpoint outputs/code_refiner_optical_e100_q8_norm/best_model.pt \
+    --tokenizer-path models/MiMo-Audio-Tokenizer \
+    --input examples/optical/mix/boy1_WOLDV_001.wav \
+    --output outputs/code_refiner_optical_e100_q8_norm/inference_boy1_001_refined.wav \
+    --num-quantizer-layers 8
+  ```
+
+**觀察 / 待辦**:
+1. 對 N=8 而言，加入 per-utterance waveform normalization 後，Val CE 由 ~2.78 上升到 ~3.05，退化幅度比 N=4 更明顯，顯示在多層 RVQ token refinement 任務裡，WaveNorm 並沒有幫助 code-level CE 收斂，甚至削弱了可學訊息。
+2. 待進一步主觀聽感與客觀指標比較 `code_refiner_optical_e100_q8` vs `code_refiner_optical_e100_q8_norm`，確認音質是否同樣退化；若無明顯優勢，可考慮在 CodeRefiner 主線中維持「不做 waveform normalize」的設定。
+3. 綜合 N=4/N=8 的結果，WaveNorm 對 CodeRefiner 的 CE 表現皆無正向效果，後續若要導入 normalization，可能需要改在 Mel / feature 層面重新設計，而不是直接對 waveform 做 per-utterance 標準化。
+
+---
+
 ## 最新實驗 (2025-11-26)
 ### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=12, E100)
 **狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
