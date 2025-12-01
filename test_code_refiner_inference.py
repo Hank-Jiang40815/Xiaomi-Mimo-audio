@@ -25,6 +25,11 @@ def main():
     ap.add_argument("--input", type=str, required=True)
     ap.add_argument("--output", type=str, required=True)
     ap.add_argument("--num-quantizer-layers", type=int, default=1, help="How many RVQ layers to refine (from layer 0)")
+    ap.add_argument(
+        "--official-mel",
+        action="store_true",
+        help="Use MiMo official wav2mel front-end (config.nfft + log-mel) when encoding waveform to codes.",
+    )
     args = ap.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -53,7 +58,9 @@ def main():
     wav = wav.unsqueeze(0)  # [1, 1, S]
 
     with torch.no_grad():
-        codes = encode_waveforms_to_codes(tokenizer, wav, device)  # [n_q, T]
+        codes = encode_waveforms_to_codes(
+            tokenizer, wav, device, use_official_mel=args.official_mel
+        )  # [n_q, T]
         refined_codes = codes.clone()
         n_q = codes.shape[0]
         layers = min(args.num_quantizer_layers, n_q)
@@ -62,6 +69,13 @@ def main():
             logits = refiner(noisy)
             refined = logits.argmax(dim=-1)  # [1, T]
             refined_codes[q] = refined.squeeze(0)
+
+        # Clamp refined codes per RVQ layer to valid codebook range
+        rvq = tokenizer.encoder.quantizer.vq
+        codebook_sizes = [layer._codebook.embed.shape[0] for layer in rvq.layers]
+        for q in range(refined_codes.shape[0]):
+            max_id = codebook_sizes[q]
+            refined_codes[q].clamp_(min=0, max=max_id - 1)
 
         # decode back to waveform
         hidden = tokenizer.encoder.decode_vq(refined_codes)

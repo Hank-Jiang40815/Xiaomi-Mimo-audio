@@ -51,6 +51,53 @@
 
 ---
 
+## 最新實驗 (2025-12-01)
+### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=4, E100, Official Mel)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 分支：`exp/code-refinement`
+- 訓練腳本：`finetune_code_refiner.py`
+- tmux + docker：
+  ```bash
+  tmux new -s code_refiner_e100_q4_officialmel \
+    "docker run --gpus all --rm -v \"$(pwd)\":/workspace -w /workspace mimo-audio:latest \
+     bash -lc \"python finetune_code_refiner.py \
+       --data-dir ./data/splits/finetune_optical \
+       --tokenizer-path ./models/MiMo-Audio-Tokenizer \
+       --output-dir ./outputs/code_refiner_optical_e100_q4_officialmel \
+       --epochs 100 --batch-size 4 --lr 1e-4 \
+       --num-quantizer-layers 4 \
+       --official-mel\""
+  ```
+
+**架構與手法**:
+- 與 baseline N=4 相同：凍結 MiMo-Audio-Tokenizer 的 encoder + RVQ quantizer + decoder，使用共享 Transformer CodeRefiner (d_model=256, nhead=4, num_layers=2, ff=1024, dropout=0.1) 對前 4 個 RVQ 層的離散 codes 做 CE 對齊 (noisy→clean)。
+- 差異點：改用 **MiMo 官方 wav2mel 前處理** 產生 codes：
+  - waveform → `MelSpectrogram`(n_fft=config.nfft, win_length=config.window_size, hop_length=config.hop_length, f_min=config.fmin, f_max=config.fmax, n_mels=config.n_mels, power=1.0, center=True) → log-mel。
+  - training 與 inference 都透過 `--official-mel` 使用同一條路徑。
+
+**關鍵結果**:
+- 輸出目錄：`outputs/code_refiner_optical_e100_q4_officialmel/`（`best_model.pt`、每 10 epoch checkpoint、`training_history.json`、`inference_boy1_001_refined.wav`）
+- 訓練指標：Epochs=100；Best Val Loss: **2.0489 @ epoch 27**；Final Val Loss: 2.0610（相較原始 N=4 約 2.6557，有明顯改善）
+- 單檔推理：
+  ```bash
+  python test_code_refiner_inference.py \
+    --checkpoint outputs/code_refiner_optical_e100_q4_officialmel/best_model.pt \
+    --tokenizer-path models/MiMo-Audio-Tokenizer \
+    --input examples/optical/mix/boy1_WOLDV_001.wav \
+    --output outputs/code_refiner_optical_e100_q4_officialmel/inference_boy1_001_refined.wav \
+    --num-quantizer-layers 4 \
+    --official-mel
+  ```
+
+**觀察 / 待辦**:
+1. 使用官方 wav2mel (nfft=960 + log-mel) 後，N=4 CodeRefiner 的 Val CE 從 ~2.66 進一步降到 ~2.05 左右，顯示與 MiMo 預訓練時一致的前處理，確實有助於 noisy→clean code 對齊任務的可學性。
+2. 推理端為避免 RVQ decode 出現 out-of-range index 問題，增加了 per-layer clamping：在將 refined codes 丟回 `tokenizer.encoder.decode_vq` 前，會依照每一層的 codebook size 將 indices 限制在合法範圍（不影響訓練 loss，但提升推理穩定度）。
+3. 建議後續將「N=4 + official-mel」視為 CodeRefiner 主線的預設前處理，WaveNorm 版則保留為負面對照；下一步可在此設定下再嘗試小權重聲學 loss 或 conditioning 設計。
+
+---
+
 ## 最新實驗 (2025-11-28)
 ### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=4, E100, WaveNorm)
 **狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）

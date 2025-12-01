@@ -135,7 +135,12 @@ class CodeRefiner(nn.Module):
         return logits
 
 
-def encode_waveforms_to_codes(tokenizer: MiMoAudioTokenizer, waveforms: torch.Tensor, device: torch.device):
+def encode_waveforms_to_codes(
+    tokenizer: MiMoAudioTokenizer,
+    waveforms: torch.Tensor,
+    device: torch.device,
+    use_official_mel: bool = False,
+):
     """
     將 batch waveform 透過 frozen encoder+quantizer 轉為 codes。
 
@@ -146,18 +151,35 @@ def encode_waveforms_to_codes(tokenizer: MiMoAudioTokenizer, waveforms: torch.Te
         codes: [n_q, B, T'] int64
     """
     with torch.no_grad():
-        # waveform -> Mel Spectrogram（與 encoder 設定一致）
+        # waveform -> Mel Spectrogram
         cfg = tokenizer.config
-        mel_transform = torchaudio.transforms.MelSpectrogram(
-            sample_rate=cfg.sampling_rate,
-            n_fft=1024,
-            hop_length=cfg.hop_length,
-            n_mels=cfg.n_mels,
-            f_min=0.0,
-            f_max=float(cfg.sampling_rate // 2),
-        ).to(device)
-        # waveforms: [B, 1, S] -> [B, n_mels, T]
-        mels = mel_transform(waveforms).squeeze(1).to(device)
+        if use_official_mel:
+            # 對齊 MiMo 官方 wav2mel：使用 config.nfft / window_size 並取 log-mel
+            mel_transform = torchaudio.transforms.MelSpectrogram(
+                sample_rate=cfg.sampling_rate,
+                n_fft=cfg.nfft,
+                hop_length=cfg.hop_length,
+                win_length=cfg.window_size,
+                f_min=cfg.fmin,
+                f_max=float(cfg.fmax) if cfg.fmax is not None else float(cfg.sampling_rate // 2),
+                n_mels=cfg.n_mels,
+                power=1.0,
+                center=True,
+            ).to(device)
+            spec = mel_transform(waveforms).squeeze(1).to(device)  # [B, n_mels, T]
+            mels = torch.log(torch.clamp(spec, min=1e-7))
+        else:
+            # 原本 CodeRefiner 內部使用的簡化版 Mel（n_fft=1024、無 log）
+            mel_transform = torchaudio.transforms.MelSpectrogram(
+                sample_rate=cfg.sampling_rate,
+                n_fft=1024,
+                hop_length=cfg.hop_length,
+                n_mels=cfg.n_mels,
+                f_min=0.0,
+                f_max=float(cfg.sampling_rate // 2),
+            ).to(device)
+            # waveforms: [B, 1, S] -> [B, n_mels, T]
+            mels = mel_transform(waveforms).squeeze(1).to(device)
         B, n_mels, T = mels.shape
         input_lens = torch.full((B,), T, device=device, dtype=torch.long)
 
@@ -174,7 +196,12 @@ def encode_waveforms_to_codes(tokenizer: MiMoAudioTokenizer, waveforms: torch.Te
         return codes
 
 
-def collate_codes(batch, tokenizer: MiMoAudioTokenizer, device: torch.device):
+def collate_codes(
+    batch,
+    tokenizer: MiMoAudioTokenizer,
+    device: torch.device,
+    use_official_mel: bool = False,
+):
     """
     DataLoader 預設會把 list[dict] collate 成 dict of tensors：
       batch["noisy_waveform"]: [B, 1, S]
@@ -182,8 +209,12 @@ def collate_codes(batch, tokenizer: MiMoAudioTokenizer, device: torch.device):
     """
     noisy_wavs = batch["noisy_waveform"].to(device)   # [B, 1, S]
     clean_wavs = batch["clean_waveform"].to(device)   # [B, 1, S]
-    noisy_codes = encode_waveforms_to_codes(tokenizer, noisy_wavs, device)
-    clean_codes = encode_waveforms_to_codes(tokenizer, clean_wavs, device)
+    noisy_codes = encode_waveforms_to_codes(
+        tokenizer, noisy_wavs, device, use_official_mel=use_official_mel
+    )
+    clean_codes = encode_waveforms_to_codes(
+        tokenizer, clean_wavs, device, use_official_mel=use_official_mel
+    )
     return noisy_codes, clean_codes
 
 
@@ -195,6 +226,7 @@ def train_one_epoch(
     device: torch.device,
     epoch: int,
     num_layers_used: int,
+    use_official_mel: bool = False,
 ):
     tokenizer.eval()
     refiner.train()
@@ -202,7 +234,9 @@ def train_one_epoch(
     num_batches = 0
     pbar = tqdm(dataloader, desc=f"Epoch {epoch}")
     for batch in pbar:
-        noisy_codes, clean_codes = collate_codes(batch, tokenizer, device)
+        noisy_codes, clean_codes = collate_codes(
+            batch, tokenizer, device, use_official_mel=use_official_mel
+        )
         # 使用前 num_layers_used 個 quantizer 層，每層一個序列，loss 取平均
         n_q = noisy_codes.shape[0]
         layers = min(num_layers_used, n_q)
@@ -234,13 +268,16 @@ def validate(
     dataloader: DataLoader,
     device: torch.device,
     num_layers_used: int,
+    use_official_mel: bool = False,
 ):
     tokenizer.eval()
     refiner.eval()
     total_loss = 0.0
     num_batches = 0
     for batch in tqdm(dataloader, desc="Validation"):
-        noisy_codes, clean_codes = collate_codes(batch, tokenizer, device)
+        noisy_codes, clean_codes = collate_codes(
+            batch, tokenizer, device, use_official_mel=use_official_mel
+        )
         n_q = noisy_codes.shape[0]
         layers = min(num_layers_used, n_q)
         loss = 0.0
@@ -275,6 +312,11 @@ def main():
     parser.add_argument("--projector-layers", type=int, default=2)
     parser.add_argument("--projector-ff", type=int, default=1024)
     parser.add_argument("--projector-dropout", type=float, default=0.1)
+    parser.add_argument(
+        "--official-mel",
+        action="store_true",
+        help="Use MiMo official wav2mel front-end (config.nfft + log-mel) instead of the simplified 1024-FFT mel.",
+    )
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -319,8 +361,24 @@ def main():
 
     for epoch in range(1, args.epochs + 1):
         logger.info("Epoch %d/%d", epoch, args.epochs)
-        train_loss = train_one_epoch(tokenizer, refiner, train_loader, optimizer, device, epoch, args.num_quantizer_layers)
-        val_loss = validate(tokenizer, refiner, val_loader, device, args.num_quantizer_layers)
+        train_loss = train_one_epoch(
+            tokenizer,
+            refiner,
+            train_loader,
+            optimizer,
+            device,
+            epoch,
+            args.num_quantizer_layers,
+            use_official_mel=args.official_mel,
+        )
+        val_loss = validate(
+            tokenizer,
+            refiner,
+            val_loader,
+            device,
+            args.num_quantizer_layers,
+            use_official_mel=args.official_mel,
+        )
         logger.info("Train Loss: %.4f", train_loss)
         logger.info("Val Loss:   %.4f", val_loss)
         history["train_loss"].append(train_loss)
