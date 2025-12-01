@@ -230,6 +230,52 @@
 
 ---
 
+## 最新實驗 (2025-11-28)
+### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=12, E100, WaveNorm)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 分支：`exp/code-refinement`
+- 訓練腳本：`finetune_code_refiner.py`
+- tmux + docker（排程腳本的一部分，單獨列出指令如下）：
+  ```bash
+  docker run --gpus all --rm -v "$(pwd)":/workspace -w /workspace mimo-audio:latest \
+    bash -lc "python finetune_code_refiner.py \
+      --data-dir ./data/splits/finetune_optical \
+      --tokenizer-path ./models/MiMo-Audio-Tokenizer \
+      --output-dir ./outputs/code_refiner_optical_e100_q12_norm \
+      --epochs 100 --batch-size 4 --lr 1e-4 \
+      --num-quantizer-layers 12 \
+      --normalize-waveform"
+  ```
+
+**架構與手法**:
+- 與 N=12 baseline 相同：凍結 tokenizer，使用共享 Transformer Refiner (d_model=256, nhead=4, num_layers=2, ff=1024, dropout=0.1) 對前 12 個 RVQ 層做 code-level CE 對齊。
+- 差異點：啟用 per-utterance waveform normalization，noisy/clean waveform 在轉 Mel 前先做 `(x - mean) / std`，Mel 與 quantizer 結構維持不變。
+- 資料流程：
+  - normalized noisy/clean waveform → Mel → encoder.get_features → quantizer → `codes_noisy`, `codes_clean`（約 [20, T]）。
+  - 使用前 12 個 RVQ 層（N=12），逐層 CE(noisy_q→clean_q)，總 loss 為 12 層 CE 的平均。
+
+**關鍵結果**:
+- 輸出目錄：`outputs/code_refiner_optical_e100_q12_norm/`（`best_model.pt`、每 10 epoch checkpoint、`training_history.json`、`inference_boy1_001_refined.wav`）
+- 訓練指標：Epochs=100；Best Val Loss: **3.3947 @ epoch 82**；Final Val Loss: 3.3953（高於未做 WaveNorm 的 N=12 實驗，後者約為 3.20）
+- 單檔推理：
+  ```bash
+  python test_code_refiner_inference.py \
+    --checkpoint outputs/code_refiner_optical_e100_q12_norm/best_model.pt \
+    --tokenizer-path models/MiMo-Audio-Tokenizer \
+    --input examples/optical/mix/boy1_WOLDV_001.wav \
+    --output outputs/code_refiner_optical_e100_q12_norm/inference_boy1_001_refined.wav \
+    --num-quantizer-layers 12
+  ```
+
+**觀察 / 待辦**:
+1. N=12 WaveNorm 的 Val CE 約 3.39，明顯高於未正規化版本的 ~3.20，延續 N=4/N=8 的趨勢：在 CodeRefiner 任務下，per-utterance waveform normalization 一致造成 CE 上升。
+2. 需搭配聽感比較 `code_refiner_optical_e100_q12` vs `code_refiner_optical_e100_q12_norm`，確認音質是否同樣退化；若無優勢，可將 WaveNorm 視為「負面對照」，主線仍維持原本不正規化設定。
+3. 多層（N≥12）本身就偏難收斂，再疊加 WaveNorm 後，CE 進一步惡化，更強化「不要盲目擴大 N，而應聚焦在 N=1/N=4 + 更合理的條件訊號與聲學 loss」的結論。
+
+---
+
 ## 最新實驗 (2025-11-26)
 ### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=16, E100)
 **狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
@@ -272,6 +318,50 @@
 
 ---
 
+## 最新實驗 (2025-11-28)
+### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=16, E100, WaveNorm)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 分支：`exp/code-refinement`
+- 訓練腳本：`finetune_code_refiner.py`
+- docker 排程（節錄單次命令）：
+  ```bash
+  docker run --gpus all --rm -v "$(pwd)":/workspace -w /workspace mimo-audio:latest \
+    bash -lc "python finetune_code_refiner.py \
+      --data-dir ./data/splits/finetune_optical \
+      --tokenizer-path ./models/MiMo-Audio-Tokenizer \
+      --output-dir ./outputs/code_refiner_optical_e100_q16_norm \
+      --epochs 100 --batch-size 4 --lr 1e-4 \
+      --num-quantizer-layers 16 \
+      --normalize-waveform"
+  ```
+
+**架構與手法**:
+- 與 N=16 baseline 相同：凍結 tokenizer，使用共享 Transformer Refiner (d_model=256, nhead=4, num_layers=2, ff=1024, dropout=0.1) 對前 16 個 RVQ 層做 code-level CE 對齊。
+- 啟用 per-utterance waveform normalization，noisy/clean waveform 在進入 Mel 前正規化為 mean≈0、std≈1。
+- 使用前 16 個 RVQ 層（N=16），逐層 CE(noisy_q→clean_q)，總 loss 為 16 層 CE 的平均。
+
+**關鍵結果**:
+- 輸出目錄：`outputs/code_refiner_optical_e100_q16_norm/`（`best_model.pt`、每 10 epoch checkpoint、`training_history.json`、`inference_boy1_001_refined.wav`）
+- 訓練指標：Epochs=100；Best Val Loss: **3.6028 @ epoch 97**；Final Val Loss: 3.6033（高於未做 WaveNorm 的 N=16 實驗，後者約為 3.49）
+- 單檔推理：
+  ```bash
+  python test_code_refiner_inference.py \
+    --checkpoint outputs/code_refiner_optical_e100_q16_norm/best_model.pt \
+    --tokenizer-path models/MiMo-Audio-Tokenizer \
+    --input examples/optical/mix/boy1_WOLDV_001.wav \
+    --output outputs/code_refiner_optical_e100_q16_norm/inference_boy1_001_refined.wav \
+    --num-quantizer-layers 16
+  ```
+
+**觀察 / 待辦**:
+1. N=16 WaveNorm 的 Val CE ≈3.60，再次高於未正規化版本的 ≈3.49，持續延伸「WaveNorm 對 CodeRefiner CE 不利」的結論。
+2. 由於 N=16 本身就比 N=12 更難學，再疊加 WaveNorm 後，loss 幾乎沒有改善空間，之後若要探討大 N 的行為，WaveNorm 可作為「負面對照」參考即可。
+3. 建議後續僅保留少數代表性的大 N 實驗作為 ablation，實務主線仍集中在 N=1/N=4 上，並改把心力投到 conditioning + acoustic loss 上，而非 waveform normalization。
+
+---
+
 ## 最新實驗 (2025-11-27)
 ### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=20, E100)
 **狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
@@ -311,6 +401,50 @@
 1. N=20 的 Val CE 進一步高於 N=16，確認「越多 RVQ 層同時 refinement 並不會帶來收斂上的好處」，反而讓模型學習難度與不確定性同步增加。
 2. 綜合 N=4/8/12/16/20 的實驗，可視 N=20 為「上限 ablation」，用來佐證多層 refinement 存在效益飽和甚至反向的情況；實務上較合理的工作點仍集中在 N=1/N=4。
 3. 後續建議：停止再擴大 N，而是將重心轉向（1）選擇性 refinement（只修關鍵 RVQ 層）、（2）加入 speaker/noise conditioning、以及（3）在最佳 N 設定上疊加小權重聲學 loss 進一步微調。
+
+---
+
+## 最新實驗 (2025-11-28)
+### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=20, E100, WaveNorm)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 分支：`exp/code-refinement`
+- 訓練腳本：`finetune_code_refiner.py`
+- docker 排程（節錄）：
+  ```bash
+  docker run --gpus all --rm -v "$(pwd)":/workspace -w /workspace mimo-audio:latest \
+    bash -lc "python finetune_code_refiner.py \
+      --data-dir ./data/splits/finetune_optical \
+      --tokenizer-path ./models/MiMo-Audio-Tokenizer \
+      --output-dir ./outputs/code_refiner_optical_e100_q20_norm \
+      --epochs 100 --batch-size 4 --lr 1e-4 \
+      --num-quantizer-layers 20 \
+      --normalize-waveform"
+  ```
+
+**架構與手法**:
+- 與 N=20 baseline 相同：凍結 tokenizer，使用共享 Transformer Refiner (d_model=256, nhead=4, num_layers=2, ff=1024, dropout=0.1) 對前 20 個 RVQ 層做 code-level CE 對齊。
+- 啟用 per-utterance waveform normalization，noisy/clean waveform 在進入 Mel 前先標準化。
+- 使用前 20 個 RVQ 層（N=20），逐層 CE(noisy_q→clean_q)，總 loss 為 20 層 CE 的平均。
+
+**關鍵結果**:
+- 輸出目錄：`outputs/code_refiner_optical_e100_q20_norm/`（`best_model.pt`、每 10 epoch checkpoint、`training_history.json`、`inference_boy1_001_refined.wav`）
+- 訓練指標：Epochs=100；Best Val Loss: **3.7324 @ epoch 97**；Final Val Loss: 3.7332（高於未做 WaveNorm 的 N=20 實驗，後者約為 3.66）
+- 單檔推理：
+  ```bash
+  python test_code_refiner_inference.py \
+    --checkpoint outputs/code_refiner_optical_e100_q20_norm/best_model.pt \
+    --tokenizer-path models/MiMo-Audio-Tokenizer \
+    --input examples/optical/mix/boy1_WOLDV_001.wav \
+    --output outputs/code_refiner_optical_e100_q20_norm/inference_boy1_001_refined.wav \
+    --num-quantizer-layers 20
+  ```
+
+**觀察 / 待辦**:
+1. N=20 WaveNorm 的 Val CE ≈3.73，再次高於未正規化版本的 ≈3.66，多層（大 N）下的 WaveNorm 實驗全面呈現負面效果。
+2. 綜合 N=4/8/12/16/20 的 WaveNorm 對照，可以比較明確地說：對 CodeRefiner 這種「noisy→clean code CE 對齊」任務，waveform 層的 per-utterance normalization 不但沒有穩定效果，反而削弱了模型利用振幅差異的能力。
+3. 後續若要繼續探索 normalization，建議改在 Mel/feature 層重新設計（例如 per-band 標準化或 learnable norm），而不是直接對 waveform 做 global z-score；目前 CodeRefiner 主線實驗可維持在「不做 waveform normalize」的設定。
 
 ---
 
