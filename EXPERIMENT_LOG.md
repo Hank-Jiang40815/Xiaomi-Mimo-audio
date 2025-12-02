@@ -673,6 +673,52 @@
 
 ---
 
+## 最新實驗 (2025-12-02)
+### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=20, E100, WaveNorm + Official Mel)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 分支：`exp/code-refinement`
+- 訓練腳本：`finetune_code_refiner.py`
+- tmux + docker：
+  ```bash
+  tmux new -s code_refiner_e100_q20_norm_officialmel \
+    "docker run --gpus all --rm -v \"$(pwd)\":/workspace -w /workspace mimo-audio:latest \
+     bash -lc \"python finetune_code_refiner.py \
+       --data-dir ./data/splits/finetune_optical \
+       --tokenizer-path ./models/MiMo-Audio-Tokenizer \
+       --output-dir ./outputs/code_refiner_optical_e100_q20_norm_officialmel \
+       --epochs 100 --batch-size 4 --lr 1e-4 \
+       --num-quantizer-layers 20 \
+       --normalize-waveform \
+       --official-mel\""
+  ```
+
+**架構與手法**:
+- 與 N=20_officialmel 相同：凍結 tokenizer，使用共享 Transformer Refiner 對前 20 個 RVQ 層做 code-level CE 對齊。
+- 差異點：waveform 端啟用 per-utterance normalization，再接官方 wav2mel 前處理。
+
+**關鍵結果**:
+- 輸出目錄：`outputs/code_refiner_optical_e100_q20_norm_officialmel/`（`best_model.pt`、每 10 epoch checkpoint、`training_history.json`、`inference_boy1_001_refined.wav`）
+- 訓練指標：Epochs=100；Best Val Loss: **3.4433 @ epoch 94**；Final Val Loss: 3.4440（略優於 N=20_officialmel ≈3.0293 的改善幅度有限，整體仍明顯高於 N≤16 的設定）
+- 單檔推理：
+  ```bash
+  python test_code_refiner_inference.py \
+    --checkpoint outputs/code_refiner_optical_e100_q20_norm_officialmel/best_model.pt \
+    --tokenizer-path models/MiMo-Audio-Tokenizer \
+    --input examples/optical/mix/boy1_WOLDV_001.wav \
+    --output outputs/code_refiner_optical_e100_q20_norm_officialmel/inference_boy1_001_refined.wav \
+    --num-quantizer-layers 20 \
+    --official-mel
+  ```
+
+**觀察 / 待辦**:
+1. 在 N=20 上，同時啟用 WaveNorm + official-mel 雖有小幅度 CE 改善，但 Val Loss 仍然遠高於 N=4/8/12/16 的官方前處理版本，顯示大 N 本身的難度仍是主要瓶頸。
+2. 相較於 N=4_norm_officialmel 的明顯正面效果，N=20_norm_officialmel 僅能算是「微調」，實務上不建議把全部 20 層都丟給同一個 Refiner 處理。
+3. 建議後續若要維持 N=20 的能力，可考慮改為分層 Refiner 或只精修前幾層 RVQ，讓後面層保留原始 codes，而不是試圖對所有層做強制對齊。
+
+---
+
 ## 最新實驗 (2025-11-28)
 ### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=20, E100, WaveNorm)
 **狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
