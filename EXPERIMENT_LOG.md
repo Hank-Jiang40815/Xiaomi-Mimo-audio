@@ -98,6 +98,52 @@
 
 ---
 
+## 最新實驗 (2025-12-02)
+### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=4, E100, WaveNorm + Official Mel)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 分支：`exp/code-refinement`
+- 訓練腳本：`finetune_code_refiner.py`
+- tmux + docker：
+  ```bash
+  tmux new -s code_refiner_e100_q4_norm_officialmel \
+    "docker run --gpus all --rm -v \"$(pwd)\":/workspace -w /workspace mimo-audio:latest \
+     bash -lc \"python finetune_code_refiner.py \
+       --data-dir ./data/splits/finetune_optical \
+       --tokenizer-path ./models/MiMo-Audio-Tokenizer \
+       --output-dir ./outputs/code_refiner_optical_e100_q4_norm_officialmel \
+       --epochs 100 --batch-size 4 --lr 1e-4 \
+       --num-quantizer-layers 4 \
+       --normalize-waveform \
+       --official-mel\""
+  ```
+
+**架構與手法**:
+- 與 N=4_officialmel 相同：凍結 tokenizer，使用共享 Transformer Refiner 對前 4 個 RVQ 層做 code-level CE 對齊。
+- 差異點：在 waveform 端啟用 per-utterance normalization，再接官方 wav2mel (config.nfft + log-mel)。
+
+**關鍵結果**:
+- 輸出目錄：`outputs/code_refiner_optical_e100_q4_norm_officialmel/`（`best_model.pt`、每 10 epoch checkpoint、`training_history.json`、`inference_boy1_001_refined.wav`）
+- 訓練指標：Epochs=100；Best Val Loss: **1.9814 @ epoch 36**；Final Val Loss: 1.9900（比 N=4_officialmel ≈2.05 再略好一些）
+- 單檔推理：
+  ```bash
+  python test_code_refiner_inference.py \
+    --checkpoint outputs/code_refiner_optical_e100_q4_norm_officialmel/best_model.pt \
+    --tokenizer-path models/MiMo-Audio-Tokenizer \
+    --input examples/optical/mix/boy1_WOLDV_001.wav \
+    --output outputs/code_refiner_optical_e100_q4_norm_officialmel/inference_boy1_001_refined.wav \
+    --num-quantizer-layers 4 \
+    --official-mel
+  ```
+
+**觀察 / 待辦**:
+1. 在「已經使用官方 wav2mel」的前提下再加上 waveform normalize，Val CE 從 ~2.05 進一步降到 ~1.98，幅度不大但方向是正面，顯示在此設定下 WaveNorm 不再是明顯負面因素。
+2. 目前 N=4_officialmel_norm 是所有 CodeRefiner 配置中 CE 最低的一個，建議以此作為後續加上 conditioning / 聲學 loss 的起點，並以 N=4_officialmel 作為對照。
+3. 尚未在推理流程中對 waveform 做同樣 normalize（當前 inference 只使用官方 wav2mel），若要完全對齊訓練前處理，可在未來加上對 waveform 的可選 norm flag 做進一步 ablation。
+
+---
+
 ## 最新實驗 (2025-11-28)
 ### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=4, E100, WaveNorm)
 **狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
