@@ -188,6 +188,50 @@
 
 ---
 
+## 最新實驗 (2025-12-01)
+### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=8, E100, Official Mel)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 分支：`exp/code-refinement`
+- 訓練腳本：`finetune_code_refiner.py`
+- docker 排程（節錄單次指令）：
+  ```bash
+  docker run --gpus all --rm -v "$(pwd)":/workspace -w /workspace mimo-audio:latest \
+    bash -lc "python finetune_code_refiner.py \
+      --data-dir ./data/splits/finetune_optical \
+      --tokenizer-path ./models/MiMo-Audio-Tokenizer \
+      --output-dir ./outputs/code_refiner_optical_e100_q8_officialmel \
+      --epochs 100 --batch-size 4 --lr 1e-4 \
+      --num-quantizer-layers 8 \
+      --official-mel"
+  ```
+
+**架構與手法**:
+- 與 baseline N=8 相同：凍結 tokenizer，使用共享 Transformer Refiner (d_model=256, nhead=4, num_layers=2, ff=1024, dropout=0.1) 對前 8 個 RVQ 層做 code-level CE 對齊。
+- 差異點：改用 MiMo 官方 wav2mel（config.nfft + log-mel）產生 codes，訓練與推理皆透過 `--official-mel`。
+
+**關鍵結果**:
+- 輸出目錄：`outputs/code_refiner_optical_e100_q8_officialmel/`（`best_model.pt`、每 10 epoch checkpoint、`training_history.json`、`inference_boy1_001_refined.wav`）
+- 訓練指標：Epochs=100；Best Val Loss: **2.0484 @ epoch 35**；Final Val Loss: 2.0530（相較原 N=8 約 2.7768，有明顯改善）
+- 單檔推理：
+  ```bash
+  python test_code_refiner_inference.py \
+    --checkpoint outputs/code_refiner_optical_e100_q8_officialmel/best_model.pt \
+    --tokenizer-path models/MiMo-Audio-Tokenizer \
+    --input examples/optical/mix/boy1_WOLDV_001.wav \
+    --output outputs/code_refiner_optical_e100_q8_officialmel/inference_boy1_001_refined.wav \
+    --num-quantizer-layers 8 \
+    --official-mel
+  ```
+
+**觀察 / 待辦**:
+1. 在 N=8 的設定下，official-mel 將 Val CE 從 ~2.78 壓到 ~2.05，幅度與 N=4 類似，顯示 align 到 MiMo 原生前處理對多層 RVQ code refinement 也有實質幫助。
+2. 由於 N=8 本身已經比 N=4 難學，下一步可先在 N=4 版本上優先嘗試聲學 loss / conditioning，再視需要擴展到 N=8 官方前處理版本。
+3. 後續分析建議以 N=4_officialmel / N=8_officialmel 作為主線，WaveNorm 與舊前處理版本保留為對照。
+
+---
+
 ## 最新實驗 (2025-11-28)
 ### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=8, E100, WaveNorm)
 **狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
@@ -274,6 +318,50 @@
 1. N=12 的 Val CE 反而高於 N=4/N=8，顯示對過多 RVQ 層進行 refinement 可能讓模型試圖修復資訊不足或極高頻細節，反而增加困難度。
 2. 建議後續分析時聚焦 N=1 / N=4 / N=8 三種配置的聽感與 SI-SDR/PESQ/STOI；N=12 可視為「上限實驗」，用來確認多層 refinement 不會越多越好。
 3. 若多層收益有限，未來方向可轉為：選擇性 refinement（修最重要的幾層）、加入 speaker/noise conditioning、以及小權重聲學 loss。 
+
+---
+
+## 最新實驗 (2025-12-01)
+### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=12, E100, Official Mel)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 分支：`exp/code-refinement`
+- 訓練腳本：`finetune_code_refiner.py`
+- docker 指令（節錄）：
+  ```bash
+  docker run --gpus all --rm -v "$(pwd)":/workspace -w /workspace mimo-audio:latest \
+    bash -lc "python finetune_code_refiner.py \
+      --data-dir ./data/splits/finetune_optical \
+      --tokenizer-path ./models/MiMo-Audio-Tokenizer \
+      --output-dir ./outputs/code_refiner_optical_e100_q12_officialmel \
+      --epochs 100 --batch-size 4 --lr 1e-4 \
+      --num-quantizer-layers 12 \
+      --official-mel"
+  ```
+
+**架構與手法**:
+- 與 baseline N=12 相同：凍結 tokenizer，使用共享 Transformer Refiner (d_model=256, nhead=4, num_layers=2, ff=1024, dropout=0.1) 對前 12 個 RVQ 層做 code-level CE 對齊。
+- 透過 `--official-mel` 使用 MiMo 官方 wav2mel (config.nfft + log-mel) 產生 noisy/clean codes。
+
+**關鍵結果**:
+- 輸出目錄：`outputs/code_refiner_optical_e100_q12_officialmel/`（`best_model.pt`、每 10 epoch checkpoint、`training_history.json`、`inference_boy1_001_refined.wav`）
+- 訓練指標：Epochs=100；Best Val Loss: **2.3112 @ epoch 75**；Final Val Loss: 2.3131（原 N=12 baseline 約 3.2016，顯示官方前處理在大 N 下也有顯著幫助）
+- 單檔推理：
+  ```bash
+  python test_code_refiner_inference.py \
+    --checkpoint outputs/code_refiner_optical_e100_q12_officialmel/best_model.pt \
+    --tokenizer-path models/MiMo-Audio-Tokenizer \
+    --input examples/optical/mix/boy1_WOLDV_001.wav \
+    --output outputs/code_refiner_optical_e100_q12_officialmel/inference_boy1_001_refined.wav \
+    --num-quantizer-layers 12 \
+    --official-mel
+  ```
+
+**觀察 / 待辦**:
+1. 在 N=12 的設定下，official-mel 將 Val CE 從 ~3.20 拉低到 ~2.31，說明多層 RVQ 的困難度很大一部份來自前處理與 MiMo 預訓練不一致。
+2. 雖然 N=12_officialmel 已經比舊版 N=12 好很多，但 CE 仍明顯高於 N=4/N=8 官方前處理版本；實務上仍較適合作為「上限實驗」而不是主線設定。
+3. 建議後續主要聚焦 N=4/N=8 的官方前處理版本，加上 conditioning 與聲學 loss，再視需要選擇性地觀察大 N（N=12）行為。
 
 ---
 
@@ -365,6 +453,50 @@
 
 ---
 
+## 最新實驗 (2025-12-01)
+### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=16, E100, Official Mel)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 分支：`exp/code-refinement`
+- 訓練腳本：`finetune_code_refiner.py`
+- docker 指令：
+  ```bash
+  docker run --gpus all --rm -v "$(pwd)":/workspace -w /workspace mimo-audio:latest \
+    bash -lc "python finetune_code_refiner.py \
+      --data-dir ./data/splits/finetune_optical \
+      --tokenizer-path ./models/MiMo-Audio-Tokenizer \
+      --output-dir ./outputs/code_refiner_optical_e100_q16_officialmel \
+      --epochs 100 --batch-size 4 --lr 1e-4 \
+      --num-quantizer-layers 16 \
+      --official-mel"
+  ```
+
+**架構與手法**:
+- 與 baseline N=16 相同：凍結 tokenizer，使用共享 Transformer Refiner (d_model=256, nhead=4, num_layers=2, ff=1024, dropout=0.1) 對前 16 個 RVQ 層做 code-level CE 對齊。
+- 使用官方 wav2mel 前處理產生 codes，訓練 / 推理皆開啟 `--official-mel`。
+
+**關鍵結果**:
+- 輸出目錄：`outputs/code_refiner_optical_e100_q16_officialmel/`（`best_model.pt`、每 10 epoch checkpoint、`training_history.json`、`inference_boy1_001_refined.wav`）
+- 訓練指標：Epochs=100；Best Val Loss: **2.7074 @ epoch 74**；Final Val Loss: 2.7093（原 N=16 baseline 約 3.4898，official-mel 大幅改善）
+- 單檔推理：
+  ```bash
+  python test_code_refiner_inference.py \
+    --checkpoint outputs/code_refiner_optical_e100_q16_officialmel/best_model.pt \
+    --tokenizer-path models/MiMo-Audio-Tokenizer \
+    --input examples/optical/mix/boy1_WOLDV_001.wav \
+    --output outputs/code_refiner_optical_e100_q16_officialmel/inference_boy1_001_refined.wav \
+    --num-quantizer-layers 16 \
+    --official-mel
+  ```
+
+**觀察 / 待辦**:
+1. N=16_officialmel 的 Val CE 約 2.71，雖然仍高於 N=4/N=8/N=12 官方版本，但和舊 N=16 (≈3.49) 相比已有顯著進步，證實前處理對大 N 也同樣關鍵。
+2. 由於 N=16 仍屬極難設定，仍建議只作為分析用上限實驗；主線仍以 N=4/N=8 官方前處理為主。
+3. 若未來要在大 N 上做更多探索，建議搭配更強的模型容量或層別拆分，而非完全共享同一個 Refiner。
+
+---
+
 ## 最新實驗 (2025-11-28)
 ### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=16, E100, WaveNorm)
 **狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
@@ -448,6 +580,50 @@
 1. N=20 的 Val CE 進一步高於 N=16，確認「越多 RVQ 層同時 refinement 並不會帶來收斂上的好處」，反而讓模型學習難度與不確定性同步增加。
 2. 綜合 N=4/8/12/16/20 的實驗，可視 N=20 為「上限 ablation」，用來佐證多層 refinement 存在效益飽和甚至反向的情況；實務上較合理的工作點仍集中在 N=1/N=4。
 3. 後續建議：停止再擴大 N，而是將重心轉向（1）選擇性 refinement（只修關鍵 RVQ 層）、（2）加入 speaker/noise conditioning、以及（3）在最佳 N 設定上疊加小權重聲學 loss 進一步微調。
+
+---
+
+## 最新實驗 (2025-12-01)
+### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=20, E100, Official Mel)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 分支：`exp/code-refinement`
+- 訓練腳本：`finetune_code_refiner.py`
+- docker 指令：
+  ```bash
+  docker run --gpus all --rm -v "$(pwd)":/workspace -w /workspace mimo-audio:latest \
+    bash -lc "python finetune_code_refiner.py \
+      --data-dir ./data/splits/finetune_optical \
+      --tokenizer-path ./models/MiMo-Audio-Tokenizer \
+      --output-dir ./outputs/code_refiner_optical_e100_q20_officialmel \
+      --epochs 100 --batch-size 4 --lr 1e-4 \
+      --num-quantizer-layers 20 \
+      --official-mel"
+  ```
+
+**架構與手法**:
+- 與 baseline N=20 相同：凍結 tokenizer，使用共享 Transformer Refiner (d_model=256, nhead=4, num_layers=2, ff=1024, dropout=0.1) 對前 20 個 RVQ 層做 code-level CE 對齊。
+- 使用官方 wav2mel 前處理產生 noisy/clean codes，訓練／推理皆使用 `--official-mel`。
+
+**關鍵結果**:
+- 輸出目錄：`outputs/code_refiner_optical_e100_q20_officialmel/`（`best_model.pt`、每 10 epoch checkpoint、`training_history.json`、`inference_boy1_001_refined.wav`）
+- 訓練指標：Epochs=100；Best Val Loss: **3.0293 @ epoch 78**；Final Val Loss: 3.0300（原 N=20 baseline 約 3.6608，official-mel 有明顯改善，但仍高於 N≤16 官方版本）
+- 單檔推理：
+  ```bash
+  python test_code_refiner_inference.py \
+    --checkpoint outputs/code_refiner_optical_e100_q20_officialmel/best_model.pt \
+    --tokenizer-path models/MiMo-Audio-Tokenizer \
+    --input examples/optical/mix/boy1_WOLDV_001.wav \
+    --output outputs/code_refiner_optical_e100_q20_officialmel/inference_boy1_001_refined.wav \
+    --num-quantizer-layers 20 \
+    --official-mel
+  ```
+
+**觀察 / 待辦**:
+1. N=20_officialmel 的 Val CE 約 3.03，顯著優於舊 N=20 (≈3.66)，但仍明顯高於 N=4/8/12/16 官方版本，再次確認「N 越大越難」仍然存在，只是前處理不再是主要瓶頸。
+2. 綜合所有官方前處理實驗，可將 N=1/4/8 視為較務實的工作點，大 N (12/16/20) 則多用於 ablation 與理解 RVQ 層次行為。
+3. 之後若要進一步提升大 N，可考慮分層 Refiner 或增加模型容量，而不是完全依賴單一共享 Transformer。
 
 ---
 
