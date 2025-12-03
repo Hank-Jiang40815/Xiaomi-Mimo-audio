@@ -51,6 +51,54 @@
 
 ---
 
+## 最新實驗 (2025-12-03)
+### 🧪 CodeRefiner-A - 多層 RVQ Token Refinement (N=8, E100, WaveNorm + Official Mel)
+**狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）
+
+**執行方式**:
+- 分支：`exp/code-refinement-A-layer-sweep`
+- 訓練腳本：`finetune_code_refiner.py`（單一 head 版本）
+- tmux + docker：
+  ```bash
+  tmux new -s code_refiner_A_e100_q8_norm_officialmel \
+    "docker run --gpus all --rm -v \"$(pwd)\":/workspace -w /workspace mimo-audio:latest \
+     bash -lc \"python finetune_code_refiner.py \
+       --data-dir ./data/splits/finetune_optical \
+       --tokenizer-path ./models/MiMo-Audio-Tokenizer \
+       --output-dir ./outputs/code_refiner_optical_A_e100_q8_norm_officialmel \
+       --epochs 100 --batch-size 4 --lr 1e-4 \
+       --num-quantizer-layers 8 \
+       --normalize-waveform \
+       --official-mel\""
+  ```
+
+**架構與手法**:
+- 與官方前處理 N=8 實驗相同：凍結 tokenizer，使用共享 Transformer CodeRefiner (d_model=256, nhead=4, num_layers=2, ff=1024, dropout=0.1) 對前 8 個 RVQ 層做 code-level CE 對齊。
+- 前處理：
+  - WaveNorm：訓練時在 Dataset 中對 noisy/clean waveform 做 per-utterance `(x-mean)/std`。
+  - Official Mel：waveform → config.nfft/window_size 的 Mel → log-mel（`--official-mel`）。
+
+**關鍵結果**:
+- 輸出目錄：`outputs/code_refiner_optical_A_e100_q8_norm_officialmel/`（`best_model.pt`、每 10 epoch checkpoint、`training_history.json`、`inference_boy1_001_refined.wav`）
+- 訓練指標：Epochs=100；Best Val Loss: **2.2423 @ epoch 69**；Final Val Loss: 2.2447（略高於 N=4_norm_officialmel ≈1.98，約略接近 per-layer head 版 N=8_heads≈2.24）
+- 單檔推理：
+  ```bash
+  python test_code_refiner_inference.py \
+    --checkpoint outputs/code_refiner_optical_A_e100_q8_norm_officialmel/best_model.pt \
+    --tokenizer-path models/MiMo-Audio-Tokenizer \
+    --input examples/optical/mix/boy1_WOLDV_001.wav \
+    --output outputs/code_refiner_optical_A_e100_q8_norm_officialmel/inference_boy1_001_refined.wav \
+    --num-quantizer-layers 8 \
+    --normalize-waveform \
+    --official-mel
+  ```
+
+**觀察 / 待辦**:
+1. 在 A 線（單 head）下，N=8_norm_officialmel 的 Val CE 約 2.24，明顯低於舊 N=8（非 official-mel、非 WaveNorm）的 ~2.78，但仍高於 N=4_norm_officialmel 的 ~1.98，顯示「只修前 8 層」的難度仍高於只修前 4 層。
+2. 與 B 線 per-layer head 的 N=8_heads（Best≈2.2430）相比，A 線的單 head 結果非常接近，說明在目前設定下 head 拆層與否並非主導因素。
+3. 實務上仍可將 N=4_norm_officialmel 視為主工作點，N=8_norm_officialmel 作為「多修幾層是否有實質聽感提升」的對照實驗，需搭配主觀聽感進一步判斷是否值得增加這層複雜度。
+
+---
 ## 最新實驗 (2025-12-01)
 ### 🧪 CodeRefiner - 多層 RVQ Token Refinement (N=4, E100, Official Mel)
 **狀態**: ✅ 已完成（100/100 epochs + 單檔 inference）

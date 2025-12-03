@@ -26,6 +26,11 @@ def main():
     ap.add_argument("--output", type=str, required=True)
     ap.add_argument("--num-quantizer-layers", type=int, default=1, help="How many RVQ layers to refine (from layer 0)")
     ap.add_argument(
+        "--normalize-waveform",
+        action="store_true",
+        help="Apply per-utterance waveform normalization (mean/std) before MelSpectrogram.",
+    )
+    ap.add_argument(
         "--official-mel",
         action="store_true",
         help="Use MiMo official wav2mel front-end (config.nfft + log-mel) when encoding waveform to codes.",
@@ -55,6 +60,11 @@ def main():
 
     sr = tokenizer.config.sampling_rate
     wav = load_wave(args.input, sr).to(device)
+    if args.normalize_waveform:
+        eps = 1e-6
+        mean = wav.mean()
+        std = wav.std().clamp_min(eps)
+        wav = (wav - mean) / std
     wav = wav.unsqueeze(0)  # [1, 1, S]
 
     with torch.no_grad():
